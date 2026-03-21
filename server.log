@@ -1,0 +1,98 @@
+============================================================
+Dynamic Dashboard Generation Server
+============================================================
+
+Features:
+  ✓ Dynamic chart generation (Pie, Bar, Line, Metrics)
+  ✓ Create/Update dashboards via prompt
+  ✓ Jira task assignment integration
+  ✓ Excel/CSV export functionality
+  ✓ LangGraph-powered workflow
+
+Start the server and access at: http://localhost:5000
+============================================================
+ * Serving Flask app 'server'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.31.10.7:5000
+Press CTRL+C to quit
+127.0.0.1 - - [21/Mar/2026 11:40:15] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:40:27] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:40:31] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:40:36] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:40:44] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:40:52] "GET /api/export/2c4bfabb HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /api/jira/tasks HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /api/chart/2c4bfabb_pie.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:26] "GET /api/chart/6ddcd2b5_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:57] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:57] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:57] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:57] "GET /api/chart/83d0c44d_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:59] "PUT /api/dashboard/83d0c44d HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:59] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:59] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:46:59] "GET /api/chart/c17b261d_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/chart/cc3aba97_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/chart/78f3a316_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:00] "GET /api/chart/e0536dc6_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:34] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:34] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:34] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:34] "GET /api/chart/2615ddf0_metrics.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:37] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:37] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:37] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:37] "GET /api/chart/f6bf7cf8_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/chart/cbc61e44_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/chart/aa1f782c_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/chart/95880f3a_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:38] "GET /api/chart/ce330883_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/chart/66246c55_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "PUT /api/dashboard/ce330883 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:39] "GET /api/chart/9ff9c6c6_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:40] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:40] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:40] "GET /api/chart/b0856a86_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/chart/ef4d2318_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/dashboards HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/chart/348573eb_bar.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:47:41] "GET /api/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2026 11:50:33] "GET /api/export/78f3a316 HTTP/1.1" 200 -

@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Dashboard Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #858796;
+            --success-color: #1cc88a;
+            --info-color: #36b9cc;
+            --warning-color: #f6c23e;
+            --danger-color: #e74a3b;
+            --light-color: #f8f9fc;
+            --dark-color: #5a5c69;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .main-container {
+            padding: 30px;
+        }
+        
+        .header-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header-section h1 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .prompt-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .prompt-input {
+            border: 2px solid #e3e6f0;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .prompt-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        }
+        
+        .generate-btn {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 15px 40px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 115, 223, 0.4);
+        }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .chart-container {
+            position: relative;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chart-image {
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .metric-card.success {
+            border-left-color: var(--success-color);
+        }
+        
+        .metric-card.info {
+            border-left-color: var(--info-color);
+        }
+        
+        .metric-card.warning {
+            border-left-color: var(--warning-color);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+        
+        .metric-label {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-action {
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-export {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
+            color: white;
+        }
+        
+        .btn-jira {
+            background-color: var(--info-color);
+            border-color: var(--info-color);
+            color: white;
+        }
+        
+        .btn-update {
+            background-color: var(--warning-color);
+            border-color: var(--warning-color);
+            color: white;
+        }
+        
+        .jira-modal .modal-content {
+            border-radius: 15px;
+            border: none;
+        }
+        
+        .jira-task-card {
+            background: #f8f9fc;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--info-color);
+        }
+        
+        .example-prompts {
+            background: #f8f9fc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .example-prompt {
+            background: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid #e3e6f0;
+        }
+        
+        .example-prompt:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading-spinner .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: var(--primary-color);
+        }
+        
+        .response-alert {
+            display: none;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .quick-action-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .quick-action-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+        
+        .quick-action-btn.pie {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .quick-action-btn.bar {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .quick-action-btn.metrics {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .quick-action-btn.jira {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header Section -->
+        <div class="header-section">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="bi bi-graph-up"></i> Dynamic Dashboard Generator</h1>
+                    <p class="text-muted mb-0">Create stunning visualizations using natural language prompts powered by LangGraph & Qwen</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="badge bg-primary p-2">
+                        <i class="bi bi-robot"></i> AI-Powered
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Metrics Section -->
+        <div class="metrics-grid" id="metricsSection">
+            <div class="metric-card">
+                <div class="metric-value" id="totalDashboards">0</div>
+                <div class="metric-label">Total Dashboards</div>
+            </div>
+            <div class="metric-card success">
+                <div class="metric-value" id="totalCharts">0</div>
+                <div class="metric-label">Charts Created</div>
+            </div>
+            <div class="metric-card info">
+                <div class="metric-value" id="totalTasks">0</div>
+                <div class="metric-label">Jira Tasks</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="metric-value" id="totalExports">0</div>
+                <div class="metric-label">Exports</div>
+            </div>
+        </div>
+        
+        <!-- Prompt Section -->
+        <div class="prompt-section">
+            <h3 class="mb-4"><i class="bi bi-chat-dots"></i> Describe Your Dashboard</h3>
+            <div class="mb-3">
+                <textarea 
+                    class="form-control prompt-input" 
+                    id="promptInput" 
+                    rows="4"
+                    placeholder="E.g., Create a pie chart showing sales distribution by region, or Generate a bar chart for quarterly revenue with Excel export..."></textarea>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn generate-btn" onclick="generateDashboard()">
+                    <i class="bi bi-magic"></i> Generate Dashboard
+                </button>
+                <button class="btn btn-action btn-update" onclick="updateCurrentDashboard()" id="updateBtn" disabled>
+                    <i class="bi bi-pencil"></i> Update
+                </button>
+            </div>
+            
+            <div class="quick-actions">
+                <button class="quick-action-btn pie" onclick="useExample('pie')">
+                    <i class="bi bi-pie-chart"></i> Pie Chart
+                </button>
+                <button class="quick-action-btn bar" onclick="useExample('bar')">
+                    <i class="bi bi-bar-chart"></i> Bar Chart
+                </button>
+                <button class="quick-action-btn metrics" onclick="useExample('metrics')">
+                    <i class="bi bi-speedometer2"></i> Metrics
+                </button>
+                <button class="quick-action-btn jira" onclick="useExample('jira')">
+                    <i class="bi bi-jira"></i> Jira Task
+                </button>
+            </div>
+            
+            <div class="example-prompts">
+                <h6 class="mb-3"><i class="bi bi-lightbulb"></i> Example Prompts (click to use):</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="example-prompt" onclick="setPrompt(this.innerText)">
+                            <i class="bi bi-pie-chart"></i> Create a pie chart showing project status distribution
+                        </div>
+                        <div class="example-prompt" onclick="setPrompt(this.innerText)">
+                            <i class="bi bi-bar-chart"></i> Generate a bar chart for quarterly sales performance
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="example-prompt" onclick="setPrompt(this.innerText)">
+                            <i class="bi bi-speedometer2"></i> Show team metrics dashboard with KPIs
+                        </div>
+                        <div class="example-prompt" onclick="setPrompt(this.innerText)">
+                            <i class="bi bi-file-earmark-excel"></i> Create sales chart and export to Excel
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-white">Generating your dashboard...</p>
+        </div>
+        
+        <!-- Response Alert -->
+        <div class="alert alert-info response-alert" id="responseAlert" role="alert">
+            <i class="bi bi-info-circle"></i> <span id="responseText"></span>
+        </div>
+        
+        <!-- Dashboard Display Section -->
+        <div id="dashboardContainer">
+            <!-- Dashboards will be rendered here -->
+        </div>
+        
+        <!-- Jira Tasks Section -->
+        <div class="dashboard-card" id="jiraSection" style="display: none;">
+            <h3 class="mb-4"><i class="bi bi-jira"></i> Jira Tasks</h3>
+            <div id="jiraTasksContainer">
+                <!-- Jira tasks will be rendered here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Jira Task Modal -->
+    <div class="modal fade jira-modal" id="jiraModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-jira"></i> Assign Jira Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="jiraForm">
+                        <input type="hidden" id="jiraDashboardId">
+                        <div class="mb-3">
+                            <label class="form-label">Summary</label>
+                            <input type="text" class="form-control" id="jiraSummary" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="jiraDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Assignee</label>
+                            <input type="text" class="form-control" id="jiraAssignee" placeholder="Enter assignee name">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select" id="jiraPriority">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitJiraTask()">
+                        <i class="bi bi-check-lg"></i> Create Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Update Dashboard Modal -->
+    <div class="modal fade" id="updateModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Update Dashboard</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">New Prompt</label>
+                        <textarea class="form-control" id="updatePromptInput" rows="4"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmUpdate()">
+                        <i class="bi bi-check-lg"></i> Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Global state
+        let currentDashboardId = null;
+        let dashboards = [];
+        let jiraTasks = [];
+        let exportCount = 0;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMetrics();
+            loadDashboards();
+            loadJiraTasks();
+        });
+        
+        // Load metrics
+        async function loadMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                const data = await response.json();
+                
+                document.getElementById('totalDashboards').textContent = data.total_dashboards;
+                document.getElementById('totalCharts').textContent = 
+                    Object.values(data.chart_types).reduce((a, b) => a + b, 0);
+                document.getElementById('totalTasks').textContent = data.total_jira_tasks;
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            }
+        }
+        
+        // Load dashboards
+        async function loadDashboards() {
+            try {
+                const response = await fetch('/api/dashboards');
+                const data = await response.json();
+                dashboards = data.dashboards;
+                renderDashboards();
+            } catch (error) {
+                console.error('Error loading dashboards:', error);
+            }
+        }
+        
+        // Load Jira tasks
+        async function loadJiraTasks() {
+            try {
+                const response = await fetch('/api/jira/tasks');
+                const data = await response.json();
+                jiraTasks = data.tasks;
+                renderJiraTasks();
+                
+                if (jiraTasks.length > 0) {
+                    document.getElementById('jiraSection').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading Jira tasks:', error);
+            }
+        }
+        
+        // Render dashboards
+        function renderDashboards() {
+            const container = document.getElementById('dashboardContainer');
+            
+            if (dashboards.length === 0) {
+                container.innerHTML = `
+                    <div class="dashboard-card text-center">
+                        <i class="bi bi-graph-up" style="font-size: 4rem; color: #e3e6f0;"></i>
+                        <h4 class="mt-3 text-muted">No dashboards yet</h4>
+                        <p class="text-muted">Use the prompt above to create your first dashboard!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = dashboards.map(dash => `
+                <div class="dashboard-card" id="dashboard-${dash.id}">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h4 class="mb-3">
+                                <i class="bi bi-${getChartIcon(dash.chart_config.chart_type)}"></i>
+                                ${dash.chart_config.title || 'Dashboard'}
+                            </h4>
+                            <div class="chart-container">
+                                <img src="/api/chart/${dash.chart_config.chart_id}_${dash.chart_config.chart_type}.png" 
+                                     class="chart-image" alt="Chart">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h5 class="mb-3">Actions</h5>
+                            <div class="action-buttons">
+                                <button class="btn btn-action btn-export" onclick="exportDashboard('${dash.id}')">
+                                    <i class="bi bi-file-earmark-excel"></i> Export Excel
+                                </button>
+                                <button class="btn btn-action btn-jira" onclick="openJiraModal('${dash.id}')">
+                                    <i class="bi bi-jira"></i> Assign Task
+                                </button>
+                                <button class="btn btn-action btn-update" onclick="openUpdateModal('${dash.id}')">
+                                    <i class="bi bi-pencil"></i> Update
+                                </button>
+                                <button class="btn btn-action btn-danger" onclick="deleteDashboard('${dash.id}')">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6>Details:</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Type:</strong> ${dash.chart_config.chart_type.toUpperCase()}</li>
+                                    <li><strong>Created:</strong> ${new Date(dash.created_at).toLocaleString()}</li>
+                                    ${dash.jira_task ? `<li><strong>Jira:</strong> ${dash.jira_task.task_id}</li>` : ''}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Render Jira tasks
+        function renderJiraTasks() {
+            const container = document.getElementById('jiraTasksContainer');
+            
+            if (jiraTasks.length === 0) {
+                container.innerHTML = '<p class="text-muted">No Jira tasks assigned yet.</p>';
+                return;
+            }
+            
+            container.innerHTML = jiraTasks.map(task => `
+                <div class="jira-task-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">
+                                <span class="badge bg-info me-2">${task.task_id}</span>
+                                ${task.summary}
+                            </h5>
+                            <p class="text-muted mb-2">${task.description}</p>
+                            <div>
+                                <span class="badge bg-secondary me-1">
+                                    <i class="bi bi-person"></i> ${task.assignee}
+                                </span>
+                                <span class="badge bg-${getStatusBadge(task.status)} me-1">
+                                    <i class="bi bi-circle-fill"></i> ${task.status}
+                                </span>
+                                <span class="badge bg-${getPriorityBadge(task.priority)}">
+                                    <i class="bi bi-flag"></i> ${task.priority}
+                                </span>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editJiraTask('${task.task_id}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Helper functions
+        function getChartIcon(type) {
+            const icons = {
+                'pie': 'pie-chart',
+                'bar': 'bar-chart',
+                'line': 'graph-up',
+                'metrics': 'speedometer2'
+            };
+            return icons[type] || 'graph-up';
+        }
+        
+        function getStatusBadge(status) {
+            const badges = {
+                'To Do': 'secondary',
+                'In Progress': 'warning',
+                'Done': 'success',
+                'Blocked': 'danger'
+            };
+            return badges[status] || 'secondary';
+        }
+        
+        function getPriorityBadge(priority) {
+            const badges = {
+                'Low': 'secondary',
+                'Medium': 'info',
+                'High': 'warning',
+                'Critical': 'danger'
+            };
+            return badges[priority] || 'secondary';
+        }
+        
+        // Generate dashboard
+        async function generateDashboard() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            
+            if (!prompt) {
+                showAlert('Please enter a prompt', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            hideAlert();
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(result.response, 'success');
+                    currentDashboardId = result.chart_config?.chart_id;
+                    
+                    if (currentDashboardId) {
+                        document.getElementById('updateBtn').disabled = false;
+                    }
+                    
+                    // Reload data
+                    await loadDashboards();
+                    await loadMetrics();
+                    
+                    if (result.jira_task) {
+                        await loadJiraTasks();
+                    }
+                } else {
+                    showAlert(result.error || 'Failed to generate dashboard', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Update dashboard
+        async function updateCurrentDashboard() {
+            if (!currentDashboardId) {
+                showAlert('No dashboard selected for update', 'warning');
+                return;
+            }
+            
+            const prompt = document.getElementById('promptInput').value.trim();
+            
+            if (!prompt) {
+                showAlert('Please enter a prompt', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`/api/dashboard/${currentDashboardId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Dashboard updated successfully!', 'success');
+                    await loadDashboards();
+                    await loadMetrics();
+                } else {
+                    showAlert(result.error || 'Failed to update dashboard', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Export dashboard
+        async function exportDashboard(dashboardId) {
+            try {
+                const response = await fetch(`/api/export/${dashboardId}`);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `dashboard_${dashboardId}.xlsx`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    exportCount++;
+                    document.getElementById('totalExports').textContent = exportCount;
+                    showAlert('Dashboard exported successfully!', 'success');
+                } else {
+                    const result = await response.json();
+                    showAlert(result.error || 'Failed to export dashboard', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Jira modal
+        function openJiraModal(dashboardId) {
+            document.getElementById('jiraDashboardId').value = dashboardId;
+            document.getElementById('jiraSummary').value = 'Dashboard Task';
+            document.getElementById('jiraDescription').value = '';
+            document.getElementById('jiraAssignee').value = '';
+            document.getElementById('jiraPriority').value = 'Medium';
+            
+            const modal = new bootstrap.Modal(document.getElementById('jiraModal'));
+            modal.show();
+        }
+        
+        // Submit Jira task
+        async function submitJiraTask() {
+            const dashboardId = document.getElementById('jiraDashboardId').value;
+            const summary = document.getElementById('jiraSummary').value;
+            const description = document.getElementById('jiraDescription').value;
+            const assignee = document.getElementById('jiraAssignee').value || 'Unassigned';
+            const priority = document.getElementById('jiraPriority').value;
+            
+            try {
+                const response = await fetch('/api/jira/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        summary,
+                        description,
+                        assignee,
+                        priority,
+                        dashboard_id: dashboardId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Jira task created: ${result.task.task_id}`, 'success');
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('jiraModal'));
+                    modal.hide();
+                    
+                    // Reload tasks
+                    await loadJiraTasks();
+                    await loadMetrics();
+                } else {
+                    showAlert(result.error || 'Failed to create Jira task', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Edit Jira task
+        async function editJiraTask(taskId) {
+            const task = jiraTasks.find(t => t.task_id === taskId);
+            if (!task) return;
+            
+            const newStatus = prompt(`Update status for ${taskId}:`, task.status);
+            if (newStatus && newStatus !== task.status) {
+                try {
+                    const response = await fetch(`/api/jira/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                    
+                    if (response.ok) {
+                        showAlert('Task updated successfully!', 'success');
+                        await loadJiraTasks();
+                    }
+                } catch (error) {
+                    showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+        }
+        
+        // Update modal
+        function openUpdateModal(dashboardId) {
+            currentDashboardId = dashboardId;
+            document.getElementById('updatePromptInput').value = document.getElementById('promptInput').value;
+            
+            const modal = new bootstrap.Modal(document.getElementById('updateModal'));
+            modal.show();
+        }
+        
+        // Confirm update
+        async function confirmUpdate() {
+            const newPrompt = document.getElementById('updatePromptInput').value;
+            
+            if (!newPrompt) {
+                showAlert('Please enter a prompt', 'warning');
+                return;
+            }
+            
+            document.getElementById('promptInput').value = newPrompt;
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('updateModal'));
+            modal.hide();
+            
+            // Update
+            await updateCurrentDashboard();
+        }
+        
+        // Delete dashboard
+        async function deleteDashboard(dashboardId) {
+            if (!confirm('Are you sure you want to delete this dashboard?')) return;
+            
+            try {
+                // Note: You may want to add a DELETE endpoint to the server
+                dashboards = dashboards.filter(d => d.id !== dashboardId);
+                renderDashboards();
+                await loadMetrics();
+                
+                showAlert('Dashboard deleted successfully!', 'success');
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Utility functions
+        function showLoading(show) {
+            document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+        }
+        
+        function showAlert(message, type = 'info') {
+            const alert = document.getElementById('responseAlert');
+            const text = document.getElementById('responseText');
+            
+            alert.className = `alert alert-${type} response-alert`;
+            text.textContent = message;
+            alert.style.display = 'block';
+            
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function hideAlert() {
+            document.getElementById('responseAlert').style.display = 'none';
+        }
+        
+        function setPrompt(text) {
+            document.getElementById('promptInput').value = text.replace(/^\s*[^\s]+\s*/, '').trim();
+        }
+        
+        function useExample(type) {
+            const examples = {
+                'pie': 'Create a pie chart showing project status distribution with categories: Completed, In Progress, To Do, and Blocked',
+                'bar': 'Generate a bar chart for quarterly sales performance showing Q1, Q2, Q3, Q4 revenue',
+                'metrics': 'Show team metrics dashboard with KPIs for Engineering, Design, Marketing, Sales, and Support departments',
+                'jira': 'Create a dashboard and assign a Jira task to track the progress'
+            };
+            
+            document.getElementById('promptInput').value = examples[type];
+        }
+    </script>
+</body>
+</html>
