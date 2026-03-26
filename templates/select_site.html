@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Jira Site</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .card-box {
+            background: #fff; border-radius: 20px; padding: 40px;
+            width: 100%; max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .user-chip {
+            display: flex; align-items: center; gap: 10px;
+            background: #f8f9fc; border-radius: 10px; padding: 10px 16px;
+            margin-bottom: 28px; font-size: 0.9rem;
+        }
+        .user-chip img { width: 32px; height: 32px; border-radius: 50%; }
+        .site-card {
+            border: 2px solid #e3e6f0; border-radius: 12px; padding: 18px 20px;
+            margin-bottom: 12px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit;
+        }
+        .site-card:hover { border-color: #4e73df; background: #f0f4ff; color: inherit; }
+        .site-icon {
+            width: 44px; height: 44px; background: #0052cc;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .site-icon i { color: #fff; font-size: 1.2rem; }
+        .site-name { font-weight: 600; color: #1a1a2e; }
+        .site-url  { font-size: 0.82rem; color: #858796; }
+    </style>
+</head>
+<body>
+<div class="card-box">
+    <h4 class="mb-2 fw-bold">Select your Jira site</h4>
+    <p class="text-muted mb-4">You have access to multiple Jira instances. Pick one to continue.</p>
+
+    {% if user %}
+    <div class="user-chip">
+        {% if user.avatar %}
+        <img src="{{ user.avatar }}" alt="avatar">
+        {% else %}
+        <i class="bi bi-person-circle fs-4"></i>
+        {% endif %}
+        <div>
+            <div class="fw-semibold">{{ user.name or user.email }}</div>
+            <div class="text-muted" style="font-size:.8rem">{{ user.email }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/select-site">
+        {% for site in sites %}
+        <button type="submit" name="cloud_id" value="{{ site.id }}" class="site-card w-100 text-start border-0 bg-white" style="border: 2px solid #e3e6f0 !important; border-radius: 12px;">
+            {% if site.avatarUrl %}
+            <img src="{{ site.avatarUrl }}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">
+            {% else %}
+            <div class="site-icon"><i class="bi bi-building"></i></div>
+            {% endif %}
+            <div>
+                <div class="site-name">{{ site.name }}</div>
+                <div class="site-url">{{ site.url or (site.id + '.atlassian.net') }}</div>
+            </div>
+            <i class="bi bi-chevron-right ms-auto text-muted"></i>
+        </button>
+        {% endfor %}
+    </form>
+
+    <div class="mt-4 text-center">
+        <a href="/auth/logout" class="text-muted small"><i class="bi bi-box-arrow-left me-1"></i>Sign out</a>
+    </div>
+</div>
+</body>
+</html>
