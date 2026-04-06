@@ -1,580 +1,1357 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap"
+        rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --primary: #4e73df; --success: #1cc88a; --info: #36b9cc;
-            --warning: #f6c23e; --danger: #e74a3b; --muted: #858796; --dark: #5a5c69;
+            --bg: #f6f7f3;
+            --surface: #ffffff;
+            --ink: #152238;
+            --muted: #66758f;
+            --line: #e4e9f2;
+            --primary: #0f9d8a;
+            --primary-deep: #0c7d6f;
+            --success: #2eaf74;
+            --info: #2f80ed;
+            --warning: #f0b429;
+            --danger: #e5484d;
+            --accent: #ff6b4a;
+            --shadow-soft: 0 16px 36px rgba(20, 34, 56, 0.08);
         }
-        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; }
-        .page { padding: 20px; }
-        .card-white { background:#fff; border-radius:14px; padding:22px; margin-bottom:20px; box-shadow:0 6px 24px rgba(0,0,0,.09); }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 500px at 10% -20%, rgba(15, 157, 138, 0.14), transparent 70%),
+                radial-gradient(1000px 500px at 100% 0%, rgba(255, 107, 74, 0.12), transparent 72%),
+                var(--bg);
+            min-height: 100vh;
+        }
+
+        .page {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 24px 20px 32px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Sora', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .card-white {
+            background: var(--surface);
+            border-radius: 18px;
+            padding: 22px;
+            margin-bottom: 18px;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-soft);
+        }
 
         /* Metrics */
-        .metric-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
-        .metric-tile { background:#fff; border-radius:12px; padding:18px 14px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.07); }
-        .metric-tile.t1{border-top:4px solid var(--primary)}.metric-tile.t2{border-top:4px solid var(--success)}
-        .metric-tile.t3{border-top:4px solid var(--info)}.metric-tile.t4{border-top:4px solid var(--warning)}
-        .metric-num { font-size:2rem; font-weight:700; color:var(--dark); }
-        .metric-lbl { font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .metric-tile {
+            background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+            border-radius: 14px;
+            padding: 18px 14px;
+            text-align: center;
+            border: 1px solid var(--line);
+            box-shadow: 0 8px 20px rgba(20, 34, 56, 0.05);
+        }
+
+        .metric-tile.t1 {
+            border-top: 4px solid var(--primary);
+        }
+
+        .metric-tile.t2 {
+            border-top: 4px solid var(--success);
+        }
+
+        .metric-tile.t3 {
+            border-top: 4px solid var(--info);
+        }
+
+        .metric-tile.t4 {
+            border-top: 4px solid var(--accent);
+        }
+
+        .metric-num {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: var(--ink);
+            line-height: 1;
+        }
+
+        .metric-lbl {
+            font-size: .73rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            margin-top: 8px;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 350px;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .workspace-main {
+            min-width: 0;
+        }
+
+        .workspace-side {
+            position: sticky;
+            top: 18px;
+        }
+
+        .project-switch {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--ink);
+            font-size: 0.78rem;
+            padding: 4px 10px;
+            margin-left: 6px;
+            max-width: 220px;
+        }
+
+        .project-switch:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 157, 138, .14);
+        }
 
         /* Prompt */
-        .prompt-area { border:2px solid #e3e6f0; border-radius:10px; padding:14px; font-size:15px; width:100%; resize:vertical; transition:border-color .2s; }
-        .prompt-area:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(78,115,223,.15); }
-        .btn-gen { background:linear-gradient(135deg,var(--primary),#224abe); color:#fff; border:none; border-radius:10px; padding:13px 32px; font-weight:600; cursor:pointer; transition:all .2s; }
-        .btn-gen:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(78,115,223,.4); }
+        .prompt-area {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 16px;
+            min-height: 120px;
+            line-height: 1.45;
+            font-size: 15px;
+            width: 100%;
+            resize: vertical;
+            transition: border-color .2s, box-shadow .2s;
+            background: #fcfdfd;
+        }
+
+        .prompt-area:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(15, 157, 138, .14);
+        }
+
+        .btn-gen {
+            background: linear-gradient(120deg, var(--primary), var(--primary-deep));
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s, filter .2s;
+        }
+
+        .btn-gen:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(15, 157, 138, .35);
+        }
+
+        .btn-gen:active {
+            transform: translateY(0);
+        }
 
         /* Quick buttons */
-        .quick-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-        .qbtn { border:none; border-radius:22px; padding:9px 20px; color:#fff; font-weight:600; cursor:pointer; transition:transform .2s; font-size:.88rem; }
-        .qbtn:hover { transform:scale(1.05); }
-        .qbtn.pie     { background:linear-gradient(135deg,#667eea,#764ba2); }
-        .qbtn.bar     { background:linear-gradient(135deg,#f093fb,#f5576c); }
-        .qbtn.metrics { background:linear-gradient(135deg,#4facfe,#00f2fe); }
-        .qbtn.jira    { background:linear-gradient(135deg,#43e97b,#38f9d7); }
+        .quick-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .qbtn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 16px;
+            color: var(--ink);
+            background: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .16s, border-color .16s, background .16s;
+            font-size: .84rem;
+        }
+
+        .qbtn:hover {
+            transform: translateY(-1px);
+            border-color: var(--primary);
+        }
+
+        .qbtn.pie {
+            background: rgba(47, 128, 237, .1);
+        }
+
+        .qbtn.bar {
+            background: rgba(255, 107, 74, .12);
+        }
+
+        .qbtn.metrics {
+            background: rgba(15, 157, 138, .12);
+        }
+
+        .qbtn.jira {
+            background: rgba(240, 180, 41, .16);
+        }
 
         /* Example prompts */
-        .eg-box { background:#f8f9fc; border-radius:10px; padding:16px; margin-top:16px; }
-        .eg-item { background:#fff; padding:10px 14px; border-radius:8px; margin-bottom:7px; cursor:pointer; border:1px solid #e3e6f0; transition:all .2s; font-size:.9rem; }
-        .eg-item:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+        .eg-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 16px;
+            border: 1px solid var(--line);
+        }
+
+        .eg-item {
+            background: #fff;
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 7px;
+            cursor: pointer;
+            border: 1px solid var(--line);
+            transition: all .18s;
+            font-size: .88rem;
+        }
+
+        .eg-item:hover {
+            background: #f2fbf9;
+            border-color: var(--primary);
+            color: var(--ink);
+        }
 
         /* Chart */
-        .chart-box { min-height:340px; background:#f8f9fc; border-radius:10px; display:flex; align-items:center; justify-content:center; padding:10px; }
-        .chart-img  { max-width:100%; max-height:420px; border-radius:10px; object-fit:contain; }
-        .chart-placeholder { text-align:center; color:#ccc; }
+        .chart-box {
+            min-height: 340px;
+            background: #f8fafc;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border: 1px dashed #d8e0ee;
+        }
+
+        .chart-img {
+            max-width: 100%;
+            max-height: 420px;
+            border-radius: 10px;
+            object-fit: contain;
+        }
+
+        .chart-placeholder {
+            text-align: center;
+            color: #a7b3c8;
+        }
 
         /* Action buttons */
-        .act { border:none; border-radius:8px; padding:8px 14px; font-weight:500; font-size:.85rem; cursor:pointer; color:#fff; transition:opacity .2s; }
-        .act:hover { opacity:.85; }
-        .act.export { background:var(--success); }
-        .act.jira   { background:var(--info); }
-        .act.update { background:var(--warning); color:#333; }
-        .act.del    { background:var(--danger); }
+        .act {
+            border: none;
+            border-radius: 10px;
+            padding: 8px 13px;
+            font-weight: 700;
+            font-size: .82rem;
+            cursor: pointer;
+            color: #fff;
+            transition: transform .16s, filter .16s;
+        }
+
+        .act:hover {
+            transform: translateY(-1px);
+            filter: saturate(1.04);
+        }
+
+        .act.export {
+            background: var(--success);
+        }
+
+        .act.jira {
+            background: var(--info);
+        }
+
+        .act.update {
+            background: var(--warning);
+            color: #2c2c2c;
+        }
+
+        .act.del {
+            background: var(--danger);
+        }
 
         /* Jira task cards */
-        .jira-card { background:#f8f9fc; border-radius:10px; padding:13px 15px; margin-bottom:10px; border-left:4px solid var(--info); }
-        .jira-key  { font-weight:700; color:var(--info); text-decoration:none; }
-        .jira-key:hover { text-decoration:underline; }
+        .jira-card {
+            background: #f9fbff;
+            border-radius: 12px;
+            padding: 13px 15px;
+            margin-bottom: 10px;
+            border: 1px solid #dfe8f7;
+            border-left: 4px solid var(--info);
+        }
+
+        .jira-key {
+            font-weight: 800;
+            color: var(--info);
+            text-decoration: none;
+        }
+
+        .jira-key:hover {
+            text-decoration: underline;
+        }
+
+        .jira-pager {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+        }
+
+        .jira-pager-info {
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        .jira-pager-controls {
+            display: flex;
+            gap: 6px;
+        }
+
+        .jira-pager-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--ink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all .16s;
+        }
+
+        .jira-pager-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .jira-pager-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
 
         /* Query result card */
-        .q-card { background:#fff; border-radius:14px; padding:20px; margin-bottom:20px; box-shadow:0 6px 24px rgba(0,0,0,.09); }
+        .q-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+            border: 1px solid var(--line);
+            box-shadow: 0 12px 30px rgba(20, 34, 56, .08);
+            animation: riseIn .35s ease;
+        }
+
+        .table-dark {
+            --bs-table-bg: #1f2f46;
+        }
+
+        .table> :not(caption)>*>* {
+            padding: .62rem .56rem;
+        }
+
+        .badge {
+            font-weight: 600;
+            letter-spacing: .01em;
+        }
 
         /* Toast */
-        #toast { position:fixed; bottom:24px; right:24px; z-index:9999; min-width:260px; border-radius:10px; padding:13px 18px; color:#fff; font-weight:500; display:none; box-shadow:0 6px 20px rgba(0,0,0,.18); }
-        #toast.success{background:var(--success)}#toast.danger{background:var(--danger)}
-        #toast.info{background:var(--info)}#toast.warning{background:#e6a817}
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            min-width: 260px;
+            border-radius: 12px;
+            padding: 13px 18px;
+            color: #fff;
+            font-weight: 700;
+            display: none;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, .2);
+        }
+
+        #toast.success {
+            background: var(--success);
+        }
+
+        #toast.danger {
+            background: var(--danger);
+        }
+
+        #toast.info {
+            background: var(--info);
+        }
+
+        #toast.warning {
+            background: #b38316;
+        }
 
         /* Spinner */
-        #spinner { display:none; position:fixed; inset:0; background:rgba(78,115,223,.22); backdrop-filter:blur(4px); z-index:8888; align-items:center; justify-content:center; }
-        #spinner.on { display:flex; }
-        .spin-card { background:rgba(255,255,255,.97); border-radius:16px; padding:30px 38px; text-align:center; min-width:300px; box-shadow:0 8px 32px rgba(0,0,0,.18); }
+        #spinner {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 33, 56, .24);
+            backdrop-filter: blur(5px);
+            z-index: 8888;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #spinner.on {
+            display: flex;
+        }
+
+        .spin-card {
+            background: rgba(255, 255, 255, .97);
+            border-radius: 16px;
+            padding: 30px 38px;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, .22);
+            border: 1px solid #e6ecf7;
+        }
+
+        .hero-head {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-head::after {
+            content: "";
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle, rgba(15, 157, 138, .12), transparent 72%);
+            right: -90px;
+            top: -130px;
+            pointer-events: none;
+        }
+
+        @keyframes riseIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1120px) {
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workspace-side {
+                position: static;
+            }
+        }
+
+        @media (max-width: 920px) {
+            .metric-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 620px) {
+            .page {
+                padding: 14px 12px 20px;
+            }
+
+            .card-white {
+                padding: 16px;
+                border-radius: 14px;
+            }
+
+            .metric-row {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-gen,
+            .btn.btn-outline-warning {
+                width: 100%;
+            }
+
+            .d-flex.gap-3.mt-3.flex-wrap.align-items-center {
+                display: grid !important;
+                gap: 10px !important;
+            }
+
+            #toast {
+                right: 12px;
+                left: 12px;
+                min-width: auto;
+            }
+        }
     </style>
 </head>
+
 <body>
-<div class="page">
+    <div class="page">
 
-    <!-- Header with user info -->
-    <div class="card-white d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div>
-            <h2 class="mb-1" style="color:var(--primary);font-weight:700">
-                <i class="bi bi-graph-up"></i> Dashboard Generator
-            </h2>
-            <p class="text-muted mb-0 small">
-                <i class="bi bi-building me-1"></i><strong>{{ site }}</strong>
-                &nbsp;·&nbsp;
-                <i class="bi bi-folder me-1"></i><strong>{{ project_name }}</strong>
-                <span class="badge bg-light text-dark ms-1" style="font-size:.75rem">{{ project_key }}</span>
-                &nbsp;·&nbsp;
-                <a href="/select-project" class="text-muted">Switch project</a>
-            </p>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="badge bg-success p-2"><i class="bi bi-shield-lock-fill me-1"></i>OAuth</span>
-            <span class="badge bg-primary p-2"><i class="bi bi-robot me-1"></i>AI + MCP</span>
-            <div class="d-flex align-items-center gap-2">
-                {% if user.avatar %}
-                <img src="{{ user.avatar }}" style="width:36px;height:36px;border-radius:50%;border:2px solid #4e73df" alt="">
-                {% else %}
-                <i class="bi bi-person-circle fs-4 text-primary"></i>
-                {% endif %}
-                <div style="line-height:1.3">
-                    <div style="font-size:.85rem;font-weight:600">{{ user.name or user.email }}</div>
-                    <a href="/auth/logout" class="text-muted" style="font-size:.75rem">
-                        <i class="bi bi-box-arrow-right me-1"></i>Sign out
-                    </a>
+        <!-- Header with user info -->
+        <div class="card-white hero-head d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1" style="color:var(--primary);font-weight:700">
+                    <i class="bi bi-graph-up"></i> Dashboard Generator
+                </h2>
+                <p class="mb-0 small" style="color:var(--muted)">
+                    <i class="bi bi-building me-1"></i><strong>{{ site }}</strong>
+                    &nbsp;·&nbsp;
+                    <i class="bi bi-folder me-1"></i><strong id="projectNameText">{{ project_name }}</strong>
+                    <span class="badge bg-light text-dark ms-1" style="font-size:.75rem" id="projectKeyBadge">{{
+                        project_key }}</span>
+                    <select id="projectSwitcher" class="project-switch" title="Switch project"
+                        onchange="switchProject(this.value)">
+                        {% if project_key %}
+                        <option value="{{ project_key }}">{{ project_key }}{% if project_name %} — {{ project_name }}{%
+                            endif %}</option>
+                        {% else %}
+                        <option value="">Select project</option>
+                        {% endif %}
+                    </select>
+                </p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge" style="background:var(--success)"><i
+                        class="bi bi-shield-lock-fill me-1"></i>OAuth</span>
+                <span class="badge" style="background:var(--info)"><i class="bi bi-robot me-1"></i>AI + MCP</span>
+                <div class="d-flex align-items-center gap-2">
+                    {% if user.avatar %}
+                    <img src="{{ user.avatar }}"
+                        style="width:36px;height:36px;border-radius:50%;border:2px solid var(--primary)" alt="">
+                    {% else %}
+                    <i class="bi bi-person-circle fs-4" style="color:var(--primary)"></i>
+                    {% endif %}
+                    <div style="line-height:1.3">
+                        <div style="font-size:.85rem;font-weight:600">{{ user.name or user.email }}</div>
+                        <a href="/auth/logout" style="font-size:.75rem;color:var(--muted);text-decoration:none">
+                            <i class="bi bi-box-arrow-right me-1"></i>Sign out
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Metrics -->
-    <div class="metric-row">
-        <div class="metric-tile t1"><div class="metric-num" id="mDash">0</div><div class="metric-lbl">Dashboards</div></div>
-        <div class="metric-tile t2"><div class="metric-num" id="mChart">0</div><div class="metric-lbl">Charts</div></div>
-        <div class="metric-tile t3"><div class="metric-num" id="mTask">0</div><div class="metric-lbl">Jira Tasks</div></div>
-        <div class="metric-tile t4"><div class="metric-num" id="mExport">0</div><div class="metric-lbl">Exports</div></div>
-    </div>
+        <!-- Metrics -->
+        <div class="metric-row">
+            <div class="metric-tile t1">
+                <div class="metric-num" id="mDash">0</div>
+                <div class="metric-lbl">Dashboards</div>
+            </div>
+            <div class="metric-tile t2">
+                <div class="metric-num" id="mChart">0</div>
+                <div class="metric-lbl">Charts</div>
+            </div>
+            <div class="metric-tile t3">
+                <div class="metric-num" id="mTask">0</div>
+                <div class="metric-lbl">Jira Tasks</div>
+            </div>
+            <div class="metric-tile t4">
+                <div class="metric-num" id="mExport">0</div>
+                <div class="metric-lbl">Exports</div>
+            </div>
+        </div>
 
-    <!-- Prompt -->
-    <div class="card-white">
-        <h5 class="mb-3"><i class="bi bi-chat-dots text-primary"></i> Describe Your Dashboard</h5>
-        <textarea id="promptInput" class="prompt-area" rows="3"
-            placeholder="E.g. Create a pie chart showing {{ project_key }} sprint status, or List all issues in sprint 2..."></textarea>
-        <div class="d-flex gap-3 mt-3 flex-wrap align-items-center">
-            <button class="btn-gen" onclick="generateDashboard()"><i class="bi bi-magic"></i> Generate Dashboard</button>
-            <button class="btn btn-outline-warning" id="updateBtn" onclick="updateDashboard()" disabled><i class="bi bi-pencil"></i> Update</button>
-        </div>
-        <div class="quick-row">
-            <button class="qbtn pie"     onclick="setPrompt('Create a pie chart showing {{ project_key }} issue status distribution')"><i class="bi bi-pie-chart"></i> Pie Chart</button>
-            <button class="qbtn bar"     onclick="setPrompt('Generate a bar chart for {{ project_key }} issues by assignee')"><i class="bi bi-bar-chart"></i> Bar Chart</button>
-            <button class="qbtn metrics" onclick="setPrompt('Show {{ project_key }} project metrics dashboard')"><i class="bi bi-speedometer2"></i> Metrics</button>
-            <button class="qbtn jira"    onclick="setPrompt('List all issues in {{ project_key }}')"><i class="bi bi-journal-text"></i> List Issues</button>
-        </div>
-        <div class="eg-box">
-            <h6 class="mb-2"><i class="bi bi-lightbulb text-warning"></i> Example Prompts:</h6>
-            <div class="row g-2">
-                <div class="col-md-6">
-                    <div class="eg-item" onclick="setPrompt('Create a pie chart showing {{ project_key }} issue status')"><i class="bi bi-pie-chart text-primary"></i> Create a pie chart showing issue status</div>
-                    <div class="eg-item" onclick="setPrompt('List all sprints in {{ project_key }}')"><i class="bi bi-calendar3 text-info"></i> List all sprints</div>
+        <div class="workspace-grid">
+            <div class="workspace-main">
+                <!-- Prompt -->
+                <div class="card-white">
+                    <h5 class="mb-3"><i class="bi bi-chat-dots text-primary"></i> Describe Your Dashboard</h5>
+                    <textarea id="promptInput" class="prompt-area" rows="3"
+                        placeholder="E.g. Create a pie chart showing {{ project_key }} sprint status, or List all issues in sprint 2..."></textarea>
+                    <div class="d-flex gap-3 mt-3 flex-wrap align-items-center">
+                        <button class="btn-gen" onclick="generateDashboard()"><i class="bi bi-magic"></i> Generate
+                            Dashboard</button>
+                        <button class="btn btn-outline-warning" id="updateBtn" onclick="updateDashboard()" disabled><i
+                                class="bi bi-pencil"></i> Update</button>
+                    </div>
+                    <div class="quick-row">
+                        <button class="qbtn pie"
+                            onclick="setPromptTemplate('Create a pie chart showing {project} issue status distribution')"><i
+                                class="bi bi-pie-chart"></i> Pie Chart</button>
+                        <button class="qbtn bar"
+                            onclick="setPromptTemplate('Generate a bar chart for {project} issues by assignee')"><i
+                                class="bi bi-bar-chart"></i> Bar Chart</button>
+                        <button class="qbtn metrics"
+                            onclick="setPromptTemplate('Show {project} project metrics dashboard')"><i
+                                class="bi bi-speedometer2"></i> Metrics</button>
+                        <button class="qbtn jira" onclick="setPromptTemplate('List all issues in {project}')"><i
+                                class="bi bi-journal-text"></i> List Issues</button>
+                    </div>
+                    <div class="eg-box">
+                        <h6 class="mb-2"><i class="bi bi-lightbulb text-warning"></i> Example Prompts:</h6>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="eg-item"
+                                    onclick="setPromptTemplate('Create a pie chart showing {project} issue status')"><i
+                                        class="bi bi-pie-chart text-primary"></i> Create a pie chart showing issue
+                                    status</div>
+                                <div class="eg-item" onclick="setPromptTemplate('List all sprints in {project}')"><i
+                                        class="bi bi-calendar3 text-info"></i> List all sprints</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="eg-item" onclick="setPromptTemplate('Who is working on what in {project}')">
+                                    <i class="bi bi-people text-success"></i> Who is working on what
+                                </div>
+                                <div class="eg-item"
+                                    onclick="setPromptTemplate('Create a bar chart for {project} and export to Excel')">
+                                    <i class="bi bi-file-earmark-excel text-success"></i> Bar chart and export to Excel
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="eg-item" onclick="setPrompt('Who is working on what in {{ project_key }}')"><i class="bi bi-people text-success"></i> Who is working on what</div>
-                    <div class="eg-item" onclick="setPrompt('Create a bar chart for {{ project_key }} and export to Excel')"><i class="bi bi-file-earmark-excel text-success"></i> Bar chart and export to Excel</div>
+
+                <!-- Results area -->
+                <div id="resultsArea"></div>
+            </div>
+
+            <div class="workspace-side">
+                <!-- Jira Tasks Panel -->
+                <div class="card-white" id="jiraPanel" style="display:none">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> Jira Tasks — <span
+                                id="jiraPanelProjectKey">{{ project_key }}</span>
+                        </h5>
+                        <button class="btn btn-sm btn-outline-info" onclick="loadJiraTasks()"><i
+                                class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    </div>
+                    <div id="jiraList">
+                        <p class="text-muted">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Results area -->
-    <div id="resultsArea"></div>
-
-    <!-- Jira Tasks Panel -->
-    <div class="card-white" id="jiraPanel" style="display:none">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> Jira Tasks — {{ project_key }}</h5>
-            <button class="btn btn-sm btn-outline-info" onclick="loadJiraTasks()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-        </div>
-        <div id="jiraList"><p class="text-muted">Loading...</p></div>
-    </div>
-
-</div>
-
-<!-- Spinner -->
-<div id="spinner">
-    <div class="spin-card">
-        <div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem"></div>
-        <div id="spinnerStep" style="font-size:1rem;font-weight:600;color:#4e73df;margin-bottom:6px">Processing...</div>
-        <div id="spinnerDetail" style="font-size:.83rem;color:#858796">Analysing your request</div>
-        <div class="progress mt-3" style="height:5px;border-radius:3px">
-            <div id="spinnerProgress" class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width:10%"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Toast -->
-<div id="toast"></div>
-
-<!-- Jira Task Modal -->
-<div class="modal fade" id="jiraModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content" style="border-radius:14px">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-journal-text"></i> Create Jira Task</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-            <input type="hidden" id="modalDashId">
-            <div class="mb-3"><label class="form-label fw-semibold">Summary</label><input type="text" class="form-control" id="modalSummary"></div>
-            <div class="mb-3"><label class="form-label fw-semibold">Description</label><textarea class="form-control" id="modalDesc" rows="3"></textarea></div>
-            <div class="mb-3"><label class="form-label fw-semibold">Priority</label>
-                <select class="form-select" id="modalPriority"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+        <!-- Spinner -->
+        <div id="spinner">
+            <div class="spin-card">
+                <div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem"></div>
+                <div id="spinnerStep" style="font-size:1rem;font-weight:600;color:#4e73df;margin-bottom:6px">
+                    Processing...</div>
+                <div id="spinnerDetail" style="font-size:.83rem;color:#858796">Analysing your request</div>
+                <div class="progress mt-3" style="height:5px;border-radius:3px">
+                    <div id="spinnerProgress" class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                        style="width:10%"></div>
+                </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitJiraTask()"><i class="bi bi-check-lg"></i> Create</button>
+
+        <!-- Toast -->
+        <div id="toast"></div>
+
+        <!-- Jira Task Modal -->
+        <div class="modal fade" id="jiraModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-journal-text"></i> Create Jira Task</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="modalDashId">
+                        <div class="mb-3"><label class="form-label fw-semibold">Summary</label><input type="text"
+                                class="form-control" id="modalSummary"></div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Description</label><textarea
+                                class="form-control" id="modalDesc" rows="3"></textarea></div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Priority</label>
+                            <select class="form-select" id="modalPriority">
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="submitJiraTask()"><i class="bi bi-check-lg"></i>
+                            Create</button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div></div>
-</div>
 
-<!-- Update Modal -->
-<div class="modal fade" id="updateModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content" style="border-radius:14px">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-pencil"></i> Update Dashboard</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-            <label class="form-label fw-semibold">New Prompt</label>
-            <textarea class="form-control" id="updatePrompt" rows="4"></textarea>
+        <!-- Update Modal -->
+        <div class="modal fade" id="updateModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> Update Dashboard</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label fw-semibold">New Prompt</label>
+                        <textarea class="form-control" id="updatePrompt" rows="4"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="confirmUpdate()"><i class="bi bi-check-lg"></i>
+                            Update</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="confirmUpdate()"><i class="bi bi-check-lg"></i> Update</button>
+
+        <!-- Jira Task Edit Modal -->
+        <div class="modal fade" id="taskEditModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Jira Task</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="taskEditId">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Summary</label>
+                            <input type="text" class="form-control" id="taskEditSummary">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Assigned To</label>
+                            <select class="form-select" id="taskEditAssignee"></select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Priority</label>
+                            <select class="form-select" id="taskEditPriority"></select>
+                        </div>
+
+                        <div class="mb-1">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" id="taskEditStatus"></select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveTaskEdit()"><i class="bi bi-check-lg"></i>
+                            Save</button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div></div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-var currentDashId = null;
-var dashboards    = [];
-var exportCount   = 0;
-var spinTimer     = null;
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            var currentDashId = null;
+            var dashboards = [];
+            var exportCount = 0;
+            var spinTimer = null;
+            var jiraTasksAll = [];
+            var jiraTaskPage = 0;
+            var jiraTaskPageSize = 10;
+            var taskEditModal = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-    loadMetrics();
-    loadDashboards();
-    loadJiraTasks();
-});
+            document.addEventListener('DOMContentLoaded', function () {
+                loadMetrics();
+                loadDashboards();
+                loadJiraTasks();
+                loadProjectOptions();
+                syncProjectBoundUi(getCurrentProjectKey());
+            });
 
-async function api(url, opts) {
-    var res  = await fetch(url, opts || {});
-    if (res.status === 401) { window.location.href = '/login'; return; }
-    var data = await res.json();
-    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
-}
+            async function loadProjectOptions() {
+                var sel = document.getElementById('projectSwitcher');
+                if (!sel) return;
+                try {
+                    var d = await api('/api/jira/projects');
+                    var projects = d.projects || [];
+                    var currentKey = (document.getElementById('projectKeyBadge') || {}).textContent || '';
+                    currentKey = currentKey.trim();
 
-function toast(msg, type) {
-    var el = document.getElementById('toast');
-    el.textContent = msg; el.className = type || 'info'; el.style.display = 'block';
-    clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(function(){ el.style.display='none'; }, 5000);
-}
+                    if (!projects.length) {
+                        sel.innerHTML = '<option value="">No projects</option>';
+                        sel.disabled = true;
+                        return;
+                    }
 
-function spin(on) {
-    var el = document.getElementById('spinner');
-    if (on) { el.classList.add('on'); runSpinSteps(); }
-    else {
-        el.classList.remove('on'); clearTimeout(spinTimer);
-        document.getElementById('spinnerStep').textContent     = 'Processing...';
-        document.getElementById('spinnerDetail').textContent   = 'Analysing your request';
-        document.getElementById('spinnerProgress').style.width = '10%';
-    }
-}
-
-function runSpinSteps() {
-    var steps = [
-        {pct:'15%', title:'Analysing prompt...',         detail:'Understanding your request'},
-        {pct:'30%', title:'Connecting to Jira...',       detail:'Using your OAuth token'},
-        {pct:'50%', title:'Fetching Jira data...',       detail:'Calling MCP tools'},
-        {pct:'70%', title:'Processing results...',       detail:'Preparing chart data'},
-        {pct:'85%', title:'Generating chart...',         detail:'Rendering visualisation'},
-        {pct:'95%', title:'Almost done...',              detail:'Formatting response'},
-    ];
-    var i = 0;
-    function next() {
-        if (i >= steps.length) return;
-        var s = steps[i++];
-        document.getElementById('spinnerStep').textContent     = s.title;
-        document.getElementById('spinnerDetail').textContent   = s.detail;
-        document.getElementById('spinnerProgress').style.width = s.pct;
-        spinTimer = setTimeout(next, 1400);
-    }
-    next();
-}
-
-function setPrompt(text) { document.getElementById('promptInput').value = text; }
-
-async function loadMetrics() {
-    try {
-        var d = await api('/api/metrics');
-        document.getElementById('mDash').textContent  = d.total_dashboards;
-        var tot = 0; Object.values(d.chart_types).forEach(function(v){ tot += v; });
-        document.getElementById('mChart').textContent = tot;
-    } catch(e) { console.warn('Metrics:', e.message); }
-}
-
-async function loadDashboards() {
-    try {
-        var d  = await api('/api/dashboards');
-        dashboards = d.dashboards || [];
-        renderDashboards();
-    } catch(e) { console.warn('Dashboards:', e.message); }
-}
-
-function renderDashboards() {
-    var area = document.getElementById('resultsArea');
-    area.querySelectorAll('.dash-card').forEach(function(el){ el.remove(); });
-    if (!dashboards.length) {
-        if (!area.querySelector('.q-card')) {
-            area.innerHTML = '<div class="card-white text-center py-5"><i class="bi bi-graph-up" style="font-size:3.5rem;color:#e3e6f0"></i><h5 class="mt-3 text-muted">No dashboards yet</h5><p class="text-muted">Use the prompt above to create your first dashboard!</p></div>';
-        }
-        return;
-    }
-    var ph = area.querySelector('.card-white.text-center');
-    if (ph) ph.remove();
-
-    dashboards.forEach(function(dash) {
-        var cfg    = dash.chart_config || {};
-        var imgHtml = cfg.image_base64
-            ? '<img src="' + cfg.image_base64 + '" class="chart-img" alt="Chart">'
-            : '<div class="chart-placeholder"><i class="bi bi-image" style="font-size:2.5rem"></i><p class="mt-2">Chart unavailable</p></div>';
-        var jiraHtml = dash.jira_task
-            ? '<li><strong>Jira:</strong> <a href="' + (dash.jira_task.url||'#') + '" target="_blank" style="color:var(--info)">' + dash.jira_task.task_id + '</a></li>'
-            : '';
-        var srcBadge = cfg.data_source === 'jira_mcp'
-            ? '<span class="badge bg-success ms-2" style="font-size:.7rem">Live Jira</span>'
-            : '<span class="badge bg-secondary ms-2" style="font-size:.7rem">Sample</span>';
-
-        var div = document.createElement('div');
-        div.className = 'card-white dash-card'; div.id = 'dash-' + dash.id;
-        div.innerHTML =
-            '<div class="row">' +
-              '<div class="col-md-8">' +
-                '<h5 class="mb-3"><i class="bi bi-' + chartIcon(cfg.chart_type) + '"></i> ' + (cfg.title||'Dashboard') + srcBadge + '</h5>' +
-                '<div class="chart-box">' + imgHtml + '</div>' +
-              '</div>' +
-              '<div class="col-md-4">' +
-                '<h6 class="mb-2">Actions</h6>' +
-                '<div class="d-flex flex-wrap gap-2 mb-3">' +
-                  '<button class="act export" onclick="exportDash(\'' + dash.id + '\')"><i class="bi bi-file-earmark-excel"></i> Excel</button>' +
-                  '<button class="act jira"   onclick="openJiraModal(\'' + dash.id + '\')"><i class="bi bi-journal-text"></i> Task</button>' +
-                  '<button class="act update" onclick="openUpdateModal(\'' + dash.id + '\')"><i class="bi bi-pencil"></i> Update</button>' +
-                  '<button class="act del"    onclick="deleteDash(\'' + dash.id + '\')"><i class="bi bi-trash"></i></button>' +
-                '</div>' +
-                '<ul class="list-unstyled small text-muted">' +
-                  '<li><strong>Type:</strong> ' + (cfg.chart_type||'—').toUpperCase() + '</li>' +
-                  '<li><strong>Created:</strong> ' + new Date(dash.created_at).toLocaleString() + '</li>' +
-                  jiraHtml +
-                '</ul>' +
-              '</div>' +
-            '</div>';
-        area.appendChild(div);
-    });
-}
-
-async function loadJiraTasks() {
-    var panel = document.getElementById('jiraPanel');
-    var list  = document.getElementById('jiraList');
-    list.innerHTML = '<p class="text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</p>';
-    panel.style.display = 'block';
-    try {
-        var d     = await api('/api/jira/tasks');
-        var tasks = d.tasks || [];
-        document.getElementById('mTask').textContent = d.count || tasks.length;
-        if (!tasks.length) { list.innerHTML = '<p class="text-muted">No tasks found.</p>'; return; }
-        list.innerHTML = tasks.map(function(t) {
-            return '<div class="jira-card">' +
-                '<div class="d-flex justify-content-between align-items-start">' +
-                  '<div>' +
-                    '<a href="' + (t.url||'#') + '" target="_blank" class="jira-key">' + t.task_id + '</a>' +
-                    '<span class="ms-2 small">' + (t.summary||'') + '</span>' +
-                    '<div class="mt-1 d-flex flex-wrap gap-1">' +
-                      '<span class="badge bg-secondary"><i class="bi bi-person"></i> ' + (t.assignee||'Unassigned') + '</span>' +
-                      '<span class="badge bg-' + statusBadge(t.status) + '">' + (t.status||'—') + '</span>' +
-                      '<span class="badge bg-' + priorityBadge(t.priority) + '"><i class="bi bi-flag"></i> ' + (t.priority||'—') + '</span>' +
-                    '</div>' +
-                  '</div>' +
-                  '<button class="btn btn-sm btn-outline-primary ms-2" data-taskid="' + t.task_id + '" data-status="' + (t.status||'') + '" onclick="editTask(this)">' +
-                    '<i class="bi bi-pencil"></i>' +
-                  '</button>' +
-                '</div></div>';
-        }).join('');
-    } catch(e) {
-        list.innerHTML = '<div class="alert alert-warning small">' + e.message + '</div>';
-    }
-}
-
-async function generateDashboard() {
-    var prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
-    spin(true);
-    try {
-        var result = await api('/api/generate', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({prompt: prompt})
-        });
-
-        if (result.needs_project) {
-            toast('Please select a Jira project first', 'warning');
-            window.location.href = '/select-project';
-            return;
-        }
-        // Handle clear command
-        if (result.cleared) {
-            dashboards = [];
-            renderDashboards();
-            await loadMetrics();
-            toast('All dashboards cleared!', 'info');
-            return;
-        }
-        if (result.result_type) {
-            showQueryTable(result.result_type, result.jira_results || [], result.response);
-            await loadJiraTasks();
-            return;
-        }
-        if (result.chart_config) {
-            currentDashId = result.chart_config.chart_id;
-            document.getElementById('updateBtn').disabled = false;
-            await loadDashboards();
-            await loadMetrics();
-            toast('Dashboard created!', 'success');
-            if (result.auto_export && result.dashboard_id) {
-                setTimeout(function(){ exportDash(result.dashboard_id); }, 900);
+                    sel.innerHTML = projects.map(function (p) {
+                        var selected = (p.key || '').toUpperCase() === currentKey.toUpperCase() ? ' selected' : '';
+                        var label = p.key + (p.name ? (' — ' + p.name) : '');
+                        return '<option value="' + p.key + '"' + selected + '>' + label + '</option>';
+                    }).join('');
+                    sel.disabled = false;
+                } catch (e) {
+                    console.warn('Project list:', e.message);
+                }
             }
-            if (result.jira_task) await loadJiraTasks();
-            return;
-        }
-        if (result.response) showTextCard(result.response);
-    } catch(e) { toast('Error: ' + e.message, 'danger'); }
-    finally { spin(false); }
-}
 
-function showQueryTable(resultType, results, responseText) {
-    var area = document.getElementById('resultsArea');
-    var bodyHtml = '';
-    if (resultType === 'sprints') {
-        bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Sprint</th><th>State</th><th>Start</th><th>End</th></tr></thead><tbody>' +
-            results.map(function(s) {
-                return '<tr><td><strong>' + (s.name||'—') + '</strong></td><td><span class="badge bg-' +
-                    (s.state==='active'?'success':s.state==='closed'?'secondary':'info') + '">' +
-                    (s.state||'—').toUpperCase() + '</span></td><td>' + (s.start_date||s.startDate||'—') + '</td><td>' + (s.end_date||s.endDate||'—') + '</td></tr>';
-            }).join('') + '</tbody></table>';
-    } else if (resultType === 'assignees') {
-        bodyHtml = results.map(function(r) {
-            return '<div class="mb-2"><span class="badge bg-primary me-2">' + r.count + '</span><strong>' + r.name + '</strong></div>';
-        }).join('');
-    } else if (resultType === 'issue_detail') {
-        var i = results[0] || {};
-        bodyHtml = '<table class="table table-sm"><tbody>' +
-            ['key','summary','status','assignee','priority','type','created','updated'].map(function(k) {
-                return i[k] ? '<tr><td class="fw-bold text-muted" style="width:120px">' + k.charAt(0).toUpperCase()+k.slice(1) + '</td><td>' + i[k] + '</td></tr>' : '';
-            }).join('') + '</tbody></table>';
-    } else {
-        bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th><th>Priority</th></tr></thead><tbody>' +
-            results.map(function(i) {
-                var f = i.fields || i;
-                var status   = (f.status   && f.status.name)   ? f.status.name   : (i.status   || '—');
-                var assignee = (f.assignee && f.assignee.displayName) ? f.assignee.displayName : (i.assignee || 'Unassigned');
-                var priority = (f.priority && f.priority.name) ? f.priority.name : (i.priority  || '—');
-                var summary  = f.summary || i.summary || '';
-                var key      = i.key || '';
-                return '<tr><td><strong class="text-info">' + key + '</strong></td><td>' + summary.slice(0,55) + '</td>' +
-                    '<td><span class="badge bg-' + statusBadge(status) + '">' + status + '</span></td>' +
-                    '<td>' + assignee + '</td><td>' + priority + '</td></tr>';
-            }).join('') + '</tbody></table>';
-    }
+            async function switchProject(projectKey) {
+                if (!projectKey) return;
+                var badge = document.getElementById('projectKeyBadge');
+                var current = badge ? (badge.textContent || '').trim() : '';
+                if (current.toUpperCase() === projectKey.toUpperCase()) return;
 
-    var titles = {sprints:'Sprint List', assignees:'Assignee Breakdown', issues:'Issue List', issue_detail:'Issue Details'};
-    var card = document.createElement('div');
-    card.className = 'q-card';
-    card.innerHTML =
-        '<div class="d-flex justify-content-between align-items-center mb-3">' +
-          '<h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> ' + (titles[resultType]||'Jira Results') +
-            ' <span class="badge bg-info ms-2">' + results.length + '</span></h5>' +
-          '<button class="btn btn-sm btn-outline-secondary" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i> Dismiss</button>' +
-        '</div><div class="table-responsive">' + bodyHtml + '</div>';
-    area.insertBefore(card, area.firstChild);
-}
+                var sel = document.getElementById('projectSwitcher');
+                var selectedText = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : projectKey;
+                var namePart = selectedText.split(' — ').slice(1).join(' — ').trim();
 
-function showTextCard(text) {
-    var area = document.getElementById('resultsArea');
-    var card = document.createElement('div');
-    card.className = 'q-card';
-    card.innerHTML =
-        '<div class="d-flex justify-content-between mb-2">' +
-          '<h6><i class="bi bi-info-circle text-info"></i> Result</h6>' +
-          '<button class="btn btn-sm btn-outline-secondary" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i></button>' +
-        '</div><pre style="white-space:pre-wrap;font-family:inherit;font-size:.88rem">' + text + '</pre>';
-    area.insertBefore(card, area.firstChild);
-}
+                try {
+                    if (sel) sel.disabled = true;
+                    var res = await api('/api/project/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_key: projectKey })
+                    });
 
-async function exportDash(id) {
-    try {
-        var res = await fetch('/api/export/' + id);
-        if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
-        var blob = await res.blob();
-        var url  = URL.createObjectURL(blob);
-        var a    = document.createElement('a');
-        a.href = url; a.download = 'dashboard_' + id + '.xlsx';
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-        exportCount++;
-        document.getElementById('mExport').textContent = exportCount;
-        toast('Excel downloaded!', 'success');
-    } catch(e) { toast('Export error: ' + e.message, 'danger'); }
-}
+                    if (badge) badge.textContent = res.project_key || projectKey;
+                    var nameText = document.getElementById('projectNameText');
+                    if (nameText) nameText.textContent = res.project_name || namePart || nameText.textContent;
+                    syncProjectBoundUi(res.project_key || projectKey);
 
-function openJiraModal(dashId) {
-    document.getElementById('modalDashId').value   = dashId;
-    document.getElementById('modalSummary').value  = 'Dashboard Task';
-    document.getElementById('modalDesc').value     = '';
-    document.getElementById('modalPriority').value = 'Medium';
-    new bootstrap.Modal(document.getElementById('jiraModal')).show();
-}
+                    toast('Switched to ' + (res.project_key || projectKey), 'success');
+                    dashboards = [];
+                    renderDashboards();
+                    await loadJiraTasks();
+                    await loadMetrics();
+                } catch (e) {
+                    toast('Project switch failed: ' + e.message, 'danger');
+                } finally {
+                    if (sel) sel.disabled = false;
+                }
+            }
 
-async function submitJiraTask() {
-    try {
-        var result = await api('/api/jira/tasks', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({
-                summary:      document.getElementById('modalSummary').value,
-                description:  document.getElementById('modalDesc').value,
-                priority:     document.getElementById('modalPriority').value,
-                dashboard_id: document.getElementById('modalDashId').value,
-            })
-        });
-        toast('Task created: ' + result.task.task_id, 'success');
-        bootstrap.Modal.getInstance(document.getElementById('jiraModal')).hide();
-        await loadJiraTasks(); await loadMetrics();
-    } catch(e) { toast('Jira error: ' + e.message, 'danger'); }
-}
+            async function api(url, opts) {
+                var res = await fetch(url, opts || {});
+                if (res.status === 401) { window.location.href = '/login'; return; }
 
-async function editTask(btn) {
-    var taskId  = btn.getAttribute('data-taskid');
-    var current = btn.getAttribute('data-status');
-    var newStatus = prompt('Update status for ' + taskId + ':\nCurrent: ' + current + '\n\nOptions: To Do / In Progress / In Review / Done', current);
-    if (!newStatus || newStatus === current) return;
-    try {
-        await api('/api/jira/tasks/' + taskId, {
-            method: 'PUT', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({status: newStatus})
-        });
-        toast(taskId + ' updated!', 'success'); await loadJiraTasks();
-    } catch(e) { toast('Error: ' + e.message, 'danger'); }
-}
+                var contentType = (res.headers.get('content-type') || '').toLowerCase();
+                var rawText = await res.text();
+                var data = {};
 
-function openUpdateModal(dashId) {
-    currentDashId = dashId;
-    document.getElementById('updatePrompt').value = document.getElementById('promptInput').value;
-    new bootstrap.Modal(document.getElementById('updateModal')).show();
-}
+                if (rawText) {
+                    if (contentType.includes('application/json')) {
+                        try {
+                            data = JSON.parse(rawText);
+                        } catch (e) {
+                            // Fall back to raw text when backend sends malformed JSON.
+                            data = { error: rawText };
+                        }
+                    } else {
+                        var looksLikeHtml = rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html');
+                        data = { error: looksLikeHtml ? ('HTTP ' + res.status) : rawText };
+                    }
+                }
 
-async function confirmUpdate() {
-    var p = document.getElementById('updatePrompt').value.trim();
-    if (!p) { toast('Please enter a prompt', 'warning'); return; }
-    document.getElementById('promptInput').value = p;
-    bootstrap.Modal.getInstance(document.getElementById('updateModal')).hide();
-    await updateDashboard();
-}
+                if (!res.ok) {
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }
 
-async function updateDashboard() {
-    if (!currentDashId) { toast('No dashboard selected', 'warning'); return; }
-    var prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
-    spin(true);
-    try {
-        await api('/api/dashboard/' + currentDashId, {
-            method: 'PUT', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({prompt: prompt})
-        });
-        toast('Updated!', 'success'); await loadDashboards(); await loadMetrics();
-    } catch(e) { toast('Error: ' + e.message, 'danger'); }
-    finally { spin(false); }
-}
+                return data;
+            }
 
-function deleteDash(id) {
-    if (!confirm('Delete this dashboard?')) return;
-    dashboards = dashboards.filter(function(d){ return d.id !== id; });
-    var el = document.getElementById('dash-' + id);
-    if (el) el.remove();
-    if (!dashboards.length) renderDashboards();
-    loadMetrics(); toast('Deleted', 'info');
-}
+            function toast(msg, type) {
+                var el = document.getElementById('toast');
+                el.textContent = msg; el.className = type || 'info'; el.style.display = 'block';
+                clearTimeout(window._toastTimer);
+                window._toastTimer = setTimeout(function () { el.style.display = 'none'; }, 5000);
+            }
 
-function chartIcon(t) { return ({pie:'pie-chart',bar:'bar-chart',line:'graph-up',metrics:'speedometer2'})[t]||'graph-up'; }
-function statusBadge(s) { return ({'To Do':'secondary','In Progress':'warning','In Review':'info','Done':'success'})[s]||'secondary'; }
-function priorityBadge(p) { return ({Low:'secondary',Medium:'info',High:'warning',Critical:'danger'})[p]||'secondary'; }
-</script>
+            function spin(on) {
+                var el = document.getElementById('spinner');
+                if (on) { el.classList.add('on'); runSpinSteps(); }
+                else {
+                    el.classList.remove('on'); clearTimeout(spinTimer);
+                    document.getElementById('spinnerStep').textContent = 'Processing...';
+                    document.getElementById('spinnerDetail').textContent = 'Analysing your request';
+                    document.getElementById('spinnerProgress').style.width = '10%';
+                }
+            }
+
+            function runSpinSteps() {
+                var steps = [
+                    { pct: '15%', title: 'Analysing prompt...', detail: 'Understanding your request' },
+                    { pct: '30%', title: 'Connecting to Jira...', detail: 'Using your OAuth token' },
+                    { pct: '50%', title: 'Fetching Jira data...', detail: 'Calling MCP tools' },
+                    { pct: '70%', title: 'Processing results...', detail: 'Preparing chart data' },
+                    { pct: '85%', title: 'Generating chart...', detail: 'Rendering visualisation' },
+                    { pct: '95%', title: 'Almost done...', detail: 'Formatting response' },
+                ];
+                var i = 0;
+                function next() {
+                    if (i >= steps.length) return;
+                    var s = steps[i++];
+                    document.getElementById('spinnerStep').textContent = s.title;
+                    document.getElementById('spinnerDetail').textContent = s.detail;
+                    document.getElementById('spinnerProgress').style.width = s.pct;
+                    spinTimer = setTimeout(next, 1400);
+                }
+                next();
+            }
+
+            function getCurrentProjectKey() {
+                var badge = document.getElementById('projectKeyBadge');
+                var key = badge ? (badge.textContent || '').trim() : '';
+                if (key) return key;
+
+                var sel = document.getElementById('projectSwitcher');
+                return (sel && sel.value ? sel.value : '').trim();
+            }
+
+            function syncProjectBoundUi(projectKey) {
+                var key = (projectKey || getCurrentProjectKey() || '').trim();
+                if (!key) return;
+
+                var tasksKey = document.getElementById('jiraPanelProjectKey');
+                if (tasksKey) tasksKey.textContent = key;
+
+                var promptInput = document.getElementById('promptInput');
+                if (promptInput) {
+                    promptInput.placeholder = 'E.g. Create a pie chart showing ' + key + ' sprint status, or List all issues in sprint 2...';
+                }
+            }
+
+            function setPrompt(text) { document.getElementById('promptInput').value = text; }
+
+            function setPromptTemplate(template) {
+                var key = getCurrentProjectKey();
+                setPrompt((template || '').split('{project}').join(key));
+            }
+
+            async function loadMetrics() {
+                try {
+                    var d = await api('/api/metrics');
+                    document.getElementById('mDash').textContent = d.total_dashboards;
+                    var tot = 0; Object.values(d.chart_types).forEach(function (v) { tot += v; });
+                    document.getElementById('mChart').textContent = tot;
+                } catch (e) { console.warn('Metrics:', e.message); }
+            }
+
+            async function loadDashboards() {
+                try {
+                    var d = await api('/api/dashboards');
+                    dashboards = d.dashboards || [];
+                    renderDashboards();
+                } catch (e) { console.warn('Dashboards:', e.message); }
+            }
+
+            function renderDashboards() {
+                var area = document.getElementById('resultsArea');
+                area.querySelectorAll('.dash-card').forEach(function (el) { el.remove(); });
+                if (!dashboards.length) {
+                    if (!area.querySelector('.q-card')) {
+                        area.innerHTML = '<div class="card-white text-center py-5"><i class="bi bi-graph-up" style="font-size:3.5rem;color:#e3e6f0"></i><h5 class="mt-3 text-muted">No dashboards yet</h5><p class="text-muted">Use the prompt above to create your first dashboard!</p></div>';
+                    }
+                    return;
+                }
+                var ph = area.querySelector('.card-white.text-center');
+                if (ph) ph.remove();
+
+                dashboards.forEach(function (dash) {
+                    var cfg = dash.chart_config || {};
+                    var imgHtml = cfg.image_base64
+                        ? '<img src="' + cfg.image_base64 + '" class="chart-img" alt="Chart">'
+                        : '<div class="chart-placeholder"><i class="bi bi-image" style="font-size:2.5rem"></i><p class="mt-2">Chart unavailable</p></div>';
+                    var jiraHtml = dash.jira_task
+                        ? '<li><strong>Jira:</strong> <a href="' + (dash.jira_task.url || '#') + '" target="_blank" style="color:var(--info)">' + dash.jira_task.task_id + '</a></li>'
+                        : '';
+                    var srcBadge = cfg.data_source === 'jira_mcp'
+                        ? '<span class="badge bg-success ms-2" style="font-size:.7rem">Live Jira</span>'
+                        : '<span class="badge bg-secondary ms-2" style="font-size:.7rem">Sample</span>';
+
+                    var div = document.createElement('div');
+                    div.className = 'card-white dash-card'; div.id = 'dash-' + dash.id;
+                    div.innerHTML =
+                        '<div class="row">' +
+                        '<div class="col-md-8">' +
+                        '<h5 class="mb-3"><i class="bi bi-' + chartIcon(cfg.chart_type) + '"></i> ' + (cfg.title || 'Dashboard') + srcBadge + '</h5>' +
+                        '<div class="chart-box">' + imgHtml + '</div>' +
+                        '</div>' +
+                        '<div class="col-md-4">' +
+                        '<h6 class="mb-2">Actions</h6>' +
+                        '<div class="d-flex flex-wrap gap-2 mb-3">' +
+                        '<button class="act export" onclick="exportDash(\'' + dash.id + '\')"><i class="bi bi-file-earmark-excel"></i> Excel</button>' +
+                        '<button class="act jira"   onclick="openJiraModal(\'' + dash.id + '\')"><i class="bi bi-journal-text"></i> Task</button>' +
+                        '<button class="act update" onclick="openUpdateModal(\'' + dash.id + '\')"><i class="bi bi-pencil"></i> Update</button>' +
+                        '<button class="act del"    onclick="deleteDash(\'' + dash.id + '\')"><i class="bi bi-trash"></i></button>' +
+                        '</div>' +
+                        '<ul class="list-unstyled small text-muted">' +
+                        '<li><strong>Type:</strong> ' + (cfg.chart_type || '—').toUpperCase() + '</li>' +
+                        '<li><strong>Created:</strong> ' + new Date(dash.created_at).toLocaleString() + '</li>' +
+                        jiraHtml +
+                        '</ul>' +
+                        '</div>' +
+                        '</div>';
+                    area.appendChild(div);
+                });
+            }
+
+            async function loadJiraTasks() {
+                var panel = document.getElementById('jiraPanel');
+                var list = document.getElementById('jiraList');
+                list.innerHTML = '<p class="text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</p>';
+                panel.style.display = 'block';
+                try {
+                    var d = await api('/api/jira/tasks');
+                    var tasks = d.tasks || [];
+                    jiraTasksAll = tasks;
+                    jiraTaskPage = 0;
+                    document.getElementById('mTask').textContent = d.count || tasks.length;
+                    renderJiraTasksPage();
+                } catch (e) {
+                    list.innerHTML = '<div class="alert alert-warning small">' + e.message + '</div>';
+                }
+            }
+
+            function renderJiraTasksPage() {
+                var list = document.getElementById('jiraList');
+                var tasks = jiraTasksAll || [];
+                if (!tasks.length) {
+                    list.innerHTML = '<p class="text-muted">No tasks found.</p>';
+                    return;
+                }
+
+                var total = tasks.length;
+                var totalPages = Math.max(1, Math.ceil(total / jiraTaskPageSize));
+                if (jiraTaskPage >= totalPages) jiraTaskPage = totalPages - 1;
+
+                var start = jiraTaskPage * jiraTaskPageSize;
+                var end = Math.min(start + jiraTaskPageSize, total);
+                var pageTasks = tasks.slice(start, end);
+
+                var cardsHtml = pageTasks.map(function (t) {
+                    return '<div class="jira-card">' +
+                        '<div class="d-flex justify-content-between align-items-start">' +
+                        '<div>' +
+                        '<a href="' + (t.url || '#') + '" target="_blank" class="jira-key">' + t.task_id + '</a>' +
+                        '<span class="ms-2 small">' + (t.summary || '') + '</span>' +
+                        '<div class="mt-1 d-flex flex-wrap gap-1">' +
+                        '<span class="badge bg-secondary"><i class="bi bi-person"></i> ' + (t.assignee || 'Unassigned') + '</span>' +
+                        '<span class="badge bg-' + statusBadge(t.status) + '">' + (t.status || '—') + '</span>' +
+                        '<span class="badge bg-' + priorityBadge(t.priority) + '"><i class="bi bi-flag"></i> ' + (t.priority || '—') + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<button class="btn btn-sm btn-outline-primary ms-2" data-taskid="' + t.task_id + '" onclick="openTaskEditModal(this)">' +
+                        '<i class="bi bi-pencil"></i>' +
+                        '</button>' +
+                        '</div></div>';
+                }).join('');
+
+                var pagerHtml =
+                    '<div class="jira-pager">' +
+                    '<div class="jira-pager-info">Showing ' + (start + 1) + '–' + end + ' of ' + total + '</div>' +
+                    '<div class="jira-pager-controls">' +
+                    '<button class="jira-pager-btn" onclick="changeJiraTaskPage(-1)" ' + (jiraTaskPage === 0 ? 'disabled' : '') + '>' +
+                    '<i class="bi bi-chevron-left"></i>' +
+                    '</button>' +
+                    '<button class="jira-pager-btn" onclick="changeJiraTaskPage(1)" ' + (jiraTaskPage >= totalPages - 1 ? 'disabled' : '') + '>' +
+                    '<i class="bi bi-chevron-right"></i>' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>';
+
+                list.innerHTML = cardsHtml + pagerHtml;
+            }
+
+            function changeJiraTaskPage(delta) {
+                var totalPages = Math.max(1, Math.ceil((jiraTasksAll || []).length / jiraTaskPageSize));
+                var next = jiraTaskPage + delta;
+                if (next < 0 || next >= totalPages) return;
+                jiraTaskPage = next;
+                renderJiraTasksPage();
+            }
+
+            async function generateDashboard() {
+                var prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
+                spin(true);
+                try {
+                    var result = await api('/api/generate', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+
+                    if (result.needs_project) {
+                        toast('Please select a Jira project first', 'warning');
+                        window.location.href = '/select-project';
+                        return;
+                    }
+                    // Handle clear command
+                    if (result.cleared) {
+                        dashboards = [];
+                        renderDashboards();
+                        await loadMetrics();
+                        toast('All dashboards cleared!', 'info');
+                        return;
+                    }
+                    if (result.result_type) {
+                        showQueryTable(result.result_type, result.jira_results || [], result.response);
+                        await loadJiraTasks();
+                        return;
+                    }
+                    if (result.chart_config) {
+                        currentDashId = result.chart_config.chart_id;
+                        document.getElementById('updateBtn').disabled = false;
+                        await loadDashboards();
+                        await loadMetrics();
+                        toast('Dashboard created!', 'success');
+                        if (result.auto_export && result.dashboard_id) {
+                            setTimeout(function () { exportDash(result.dashboard_id); }, 900);
+                        }
+                        if (result.jira_task) await loadJiraTasks();
+                        return;
+                    }
+                    if (result.response) showTextCard(result.response);
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+                finally { spin(false); }
+            }
+
+            function showQueryTable(resultType, results, responseText) {
+                var area = document.getElementById('resultsArea');
+                var bodyHtml = '';
+                if (resultType === 'sprints') {
+                    bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Sprint</th><th>State</th><th>Start</th><th>End</th></tr></thead><tbody>' +
+                        results.map(function (s) {
+                            return '<tr><td><strong>' + (s.name || '—') + '</strong></td><td><span class="badge bg-' +
+                                (s.state === 'active' ? 'success' : s.state === 'closed' ? 'secondary' : 'info') + '">' +
+                                (s.state || '—').toUpperCase() + '</span></td><td>' + (s.start_date || s.startDate || '—') + '</td><td>' + (s.end_date || s.endDate || '—') + '</td></tr>';
+                        }).join('') + '</tbody></table>';
+                } else if (resultType === 'assignees') {
+                    bodyHtml = results.map(function (r) {
+                        return '<div class="mb-2"><span class="badge bg-primary me-2">' + r.count + '</span><strong>' + r.name + '</strong></div>';
+                    }).join('');
+                } else if (resultType === 'issue_detail') {
+                    var i = results[0] || {};
+                    bodyHtml = '<table class="table table-sm"><tbody>' +
+                        ['key', 'summary', 'status', 'assignee', 'priority', 'type', 'created', 'updated'].map(function (k) {
+                            return i[k] ? '<tr><td class="fw-bold text-muted" style="width:120px">' + k.charAt(0).toUpperCase() + k.slice(1) + '</td><td>' + i[k] + '</td></tr>' : '';
+                        }).join('') + '</tbody></table>';
+                } else {
+                    bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th><th>Priority</th></tr></thead><tbody>' +
+                        results.map(function (i) {
+                            var f = i.fields || i;
+                            var status = (f.status && f.status.name) ? f.status.name : (i.status || '—');
+                            var assignee = (f.assignee && f.assignee.displayName) ? f.assignee.displayName : (i.assignee || 'Unassigned');
+                            var priority = (f.priority && f.priority.name) ? f.priority.name : (i.priority || '—');
+                            var summary = f.summary || i.summary || '';
+                            var key = i.key || '';
+                            return '<tr><td><strong class="text-info">' + key + '</strong></td><td>' + summary.slice(0, 55) + '</td>' +
+                                '<td><span class="badge bg-' + statusBadge(status) + '">' + status + '</span></td>' +
+                                '<td>' + assignee + '</td><td>' + priority + '</td></tr>';
+                        }).join('') + '</tbody></table>';
+                }
+
+                var titles = { sprints: 'Sprint List', assignees: 'Assignee Breakdown', issues: 'Issue List', issue_detail: 'Issue Details' };
+                var card = document.createElement('div');
+                card.className = 'q-card';
+                card.innerHTML =
+                    '<div class="d-flex justify-content-between align-items-center mb-3">' +
+                    '<h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> ' + (titles[resultType] || 'Jira Results') +
+                    ' <span class="badge bg-info ms-2">' + results.length + '</span></h5>' +
+                    '<button class="btn btn-sm btn-outline-secondary" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i> Dismiss</button>' +
+                    '</div><div class="table-responsive">' + bodyHtml + '</div>';
+                area.insertBefore(card, area.firstChild);
+            }
+
+            function showTextCard(text) {
+                var area = document.getElementById('resultsArea');
+                var card = document.createElement('div');
+                card.className = 'q-card';
+                card.innerHTML =
+                    '<div class="d-flex justify-content-between mb-2">' +
+                    '<h6><i class="bi bi-info-circle text-info"></i> Result</h6>' +
+                    '<button class="btn btn-sm btn-outline-secondary" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i></button>' +
+                    '</div><pre style="white-space:pre-wrap;font-family:inherit;font-size:.88rem">' + text + '</pre>';
+                area.insertBefore(card, area.firstChild);
+            }
+
+            async function exportDash(id) {
+                try {
+                    var res = await fetch('/api/export/' + id);
+                    if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
+                    var blob = await res.blob();
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url; a.download = 'dashboard_' + id + '.xlsx';
+                    document.body.appendChild(a); a.click();
+                    document.body.removeChild(a); URL.revokeObjectURL(url);
+                    exportCount++;
+                    document.getElementById('mExport').textContent = exportCount;
+                    toast('Excel downloaded!', 'success');
+                } catch (e) { toast('Export error: ' + e.message, 'danger'); }
+            }
+
+            function openJiraModal(dashId) {
+                document.getElementById('modalDashId').value = dashId;
+                document.getElementById('modalSummary').value = 'Dashboard Task';
+                document.getElementById('modalDesc').value = '';
+                document.getElementById('modalPriority').value = 'Medium';
+                new bootstrap.Modal(document.getElementById('jiraModal')).show();
+            }
+
+            async function submitJiraTask() {
+                try {
+                    var result = await api('/api/jira/tasks', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            summary: document.getElementById('modalSummary').value,
+                            description: document.getElementById('modalDesc').value,
+                            priority: document.getElementById('modalPriority').value,
+                            dashboard_id: document.getElementById('modalDashId').value,
+                        })
+                    });
+                    toast('Task created: ' + result.task.task_id, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('jiraModal')).hide();
+                    await loadJiraTasks(); await loadMetrics();
+                } catch (e) { toast('Jira error: ' + e.message, 'danger'); }
+            }
+
+            async function openTaskEditModal(btn) {
+                var taskId = btn.getAttribute('data-taskid');
+                try {
+                    var d = await api('/api/jira/tasks/' + taskId + '/edit-data');
+                    document.getElementById('taskEditId').value = taskId;
+                    document.getElementById('taskEditSummary').value = (d.current && d.current.summary) ? d.current.summary : '';
+
+                    var assigneeSel = document.getElementById('taskEditAssignee');
+                    var assigneeOpts = '<option value="">Unassigned</option>';
+                    (d.assignees || []).forEach(function (u) {
+                        var selected = (d.current && d.current.assignee && d.current.assignee.accountId === u.accountId) ? ' selected' : '';
+                        assigneeOpts += '<option value="' + u.accountId + '"' + selected + '>' + (u.displayName || 'Unknown User') + '</option>';
+                    });
+                    assigneeSel.innerHTML = assigneeOpts;
+
+                    var prioritySel = document.getElementById('taskEditPriority');
+                    var priorityOpts = '';
+                    (d.priorities || []).forEach(function (p) {
+                        var selected = (d.current && d.current.priority === p) ? ' selected' : '';
+                        priorityOpts += '<option value="' + p + '"' + selected + '>' + p + '</option>';
+                    });
+                    prioritySel.innerHTML = priorityOpts || '<option value="">None</option>';
+
+                    var statusSel = document.getElementById('taskEditStatus');
+                    var statusOpts = '';
+                    (d.statuses || []).forEach(function (s) {
+                        var selected = (d.current && d.current.status === s.name) ? ' selected' : '';
+                        statusOpts += '<option value="' + s.id + '"' + selected + '>' + s.name + '</option>';
+                    });
+                    statusSel.innerHTML = statusOpts || '<option value="">No transitions available</option>';
+
+                    taskEditModal = taskEditModal || new bootstrap.Modal(document.getElementById('taskEditModal'));
+                    taskEditModal.show();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+            }
+
+            async function saveTaskEdit() {
+                var taskId = document.getElementById('taskEditId').value;
+                if (!taskId) return;
+
+                var payload = {
+                    summary: document.getElementById('taskEditSummary').value.trim(),
+                    assignee_account_id: document.getElementById('taskEditAssignee').value,
+                    priority: document.getElementById('taskEditPriority').value,
+                };
+
+                var statusId = document.getElementById('taskEditStatus').value;
+                if (statusId) payload.status_id = statusId;
+
+                try {
+                    await api('/api/jira/tasks/' + taskId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    toast(taskId + ' updated!', 'success');
+                    if (taskEditModal) taskEditModal.hide();
+                    await loadJiraTasks();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+            }
+
+            function openUpdateModal(dashId) {
+                currentDashId = dashId;
+                document.getElementById('updatePrompt').value = document.getElementById('promptInput').value;
+                new bootstrap.Modal(document.getElementById('updateModal')).show();
+            }
+
+            async function confirmUpdate() {
+                var p = document.getElementById('updatePrompt').value.trim();
+                if (!p) { toast('Please enter a prompt', 'warning'); return; }
+                document.getElementById('promptInput').value = p;
+                bootstrap.Modal.getInstance(document.getElementById('updateModal')).hide();
+                await updateDashboard();
+            }
+
+            async function updateDashboard() {
+                if (!currentDashId) { toast('No dashboard selected', 'warning'); return; }
+                var prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
+                spin(true);
+                try {
+                    await api('/api/dashboard/' + currentDashId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+                    toast('Updated!', 'success'); await loadDashboards(); await loadMetrics();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+                finally { spin(false); }
+            }
+
+            function deleteDash(id) {
+                if (!confirm('Delete this dashboard?')) return;
+                dashboards = dashboards.filter(function (d) { return d.id !== id; });
+                var el = document.getElementById('dash-' + id);
+                if (el) el.remove();
+                if (!dashboards.length) renderDashboards();
+                loadMetrics(); toast('Deleted', 'info');
+            }
+
+            function chartIcon(t) { return ({ pie: 'pie-chart', bar: 'bar-chart', line: 'graph-up', metrics: 'speedometer2' })[t] || 'graph-up'; }
+            function statusBadge(s) { return ({ 'To Do': 'secondary', 'In Progress': 'warning', 'In Review': 'info', 'Done': 'success' })[s] || 'secondary'; }
+            function priorityBadge(p) { return ({ Low: 'secondary', Medium: 'info', High: 'warning', Critical: 'danger' })[p] || 'secondary'; }
+        </script>
 </body>
+
 </html>

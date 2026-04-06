@@ -35,16 +35,22 @@ import seaborn as sns
 import requests
 from requests.auth import HTTPBasicAuth
 
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-from mcp_tools import JIRA_TOOLS, set_auth_resolver
+from mcp_client import call_jira_tool, list_jira_tools, MCPClientError
 from flask_session import Session
 
 # ── Env + logging ─────────────────────────────────────────────────────────────
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user read:board-scope:jira-software read:sprint:jira-software offline_access"
+#JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user read:board-scope:jira-software read:sprint:jira-software offline_access"JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user offline_access"
 
 # ── Flask ─────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -77,7 +83,7 @@ atlassian = oauth.register(
     authorize_url="https://auth.atlassian.com/authorize",
     access_token_url="https://auth.atlassian.com/oauth/token",
     client_kwargs={
-        "scope": "read:jira-work write:jira-work read:jira-user offline_access openid profile email",
+        "scope": JIRA_OAUTH_SCOPES,
         "audience": "api.atlassian.com",
         "prompt": "consent",
     },
@@ -191,6 +197,33 @@ def get_jira_auth() -> Optional[Dict]:
     return None
 
 
+def get_mcp_auth_context() -> Optional[Dict]:
+    """Return session-scoped auth context passed to MCP tool calls."""
+    token = session.get("oauth_token")
+    cloud_id = session.get("jira_cloud_id")
+
+    if token and cloud_id:
+        return {
+            "auth_type": "oauth",
+            "cloud_id": cloud_id,
+            "access_token": token.get("access_token", ""),
+            "site": session.get("jira_site_name", ""),
+        }
+
+    server = os.getenv("JIRA_SERVER", "").rstrip("/")
+    email = os.getenv("JIRA_USER_EMAIL")
+    api_token = os.getenv("JIRA_API_TOKEN")
+    if all([server, email, api_token]):
+        return {
+            "auth_type": "apikey",
+            "server": server,
+            "email": email,
+            "api_token": api_token,
+        }
+
+    return None
+
+
 def jira_get(path: str, params: dict = None) -> dict:
     cfg  = get_jira_auth()
     if not cfg:
@@ -225,7 +258,7 @@ def jira_post(path: str, payload: dict) -> dict:
     url  = f"{cfg['base_url']}/rest/api/3/{path.lstrip('/')}"
     resp = requests.post(url, auth=cfg.get("auth"), headers=cfg["headers"], json=payload)
     resp.raise_for_status()
-    return resp.json()
+    return resp.json() if resp.content else {}
 
 
 def jira_put(path: str, payload: dict) -> dict:
@@ -245,10 +278,6 @@ def clear_user_cache():
     for k in keys_to_delete:
         del _user_cache[k]
     logger.info(f"Cache cleared for user {uid}")
-
-
-# ── Wire auth into MCP tools ──────────────────────────────────────────────────
-set_auth_resolver(get_jira_auth)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -288,6 +317,32 @@ def fetch_user_projects(cloud_id: str, access_token: str) -> List[Dict]:
         return []
 
 
+def ensure_selected_project() -> bool:
+    """Ensure a valid project is selected in session for the current Jira site."""
+    token = session.get("oauth_token", {})
+    cloud_id = session.get("jira_cloud_id")
+    access_token = token.get("access_token", "")
+    if not cloud_id or not access_token:
+        return False
+
+    projects = fetch_user_projects(cloud_id, access_token)
+    if not projects:
+        return False
+
+    current_key = (session.get("project_key") or "").upper().strip()
+    current = next((p for p in projects if (p.get("key") or "").upper() == current_key), None)
+
+    if current:
+        session["project_key"] = current.get("key", "")
+        session["project_name"] = current.get("name", "")
+        return True
+
+    first = projects[0]
+    session["project_key"] = first.get("key", "")
+    session["project_name"] = first.get("name", "")
+    return True
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # LLM setup
 # ══════════════════════════════════════════════════════════════════════════════
@@ -319,21 +374,30 @@ llm_fast = get_llm(fast=True)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def fast_dispatch(prompt_lower: str, project_key: str) -> Optional[Dict]:
-    from mcp_tools import (
-        jira_get_sprints, jira_search_issues,
-        jira_get_my_issues, jira_get_project_summary, jira_get_issue
-    )
+    auth_context = get_mcp_auth_context()
+    if not auth_context:
+        return None
+
+    def _mcp_call(name: str, args: Dict[str, Any]) -> Dict:
+        try:
+            merged = {"auth_context": auth_context, **args}
+            return call_jira_tool(name, merged)
+        except MCPClientError as e:
+            logger.warning(f"FAST MCP call failed ({name}): {e}")
+            return {"error": str(e)}
 
     if any(p in prompt_lower for p in ["list sprint", "show sprint", "get sprint", "all sprint", "sprints"]):
         logger.info("[FAST] jira_get_sprints")
-        result  = jira_get_sprints.invoke({"project_key": project_key})
+        result = _mcp_call("jira_get_sprints", {"project_key": project_key})
+        if result.get("error"):
+            return {"error": result["error"], "response": result["error"]}
         sprints = result.get("sprints", [])
         return {"sprints": sprints, "result_type": "sprints",
                 "response": f"Found {len(sprints)} sprint(s)", "jira_results": sprints}
 
     if any(p in prompt_lower for p in ["my issue", "my task", "assigned to me", "what am i working"]):
         logger.info("[FAST] jira_get_my_issues")
-        result = jira_get_my_issues.invoke({"project_key": project_key})
+        result = _mcp_call("jira_get_my_issues", {"project_key": project_key})
         issues = result.get("issues", [])
         return {"issues": issues, "result_type": "issues",
                 "response": f"Found {len(issues)} issue(s) assigned to you", "jira_results": issues}
@@ -341,28 +405,76 @@ def fast_dispatch(prompt_lower: str, project_key: str) -> Optional[Dict]:
     issue_match = re.search(r"[A-Z]+-[0-9]+", prompt_lower.upper())
     if issue_match and any(p in prompt_lower for p in ["tell me", "details", "about", "show", "status of"]):
         logger.info(f"[FAST] jira_get_issue({issue_match.group()})")
-        result = jira_get_issue.invoke({"issue_key": issue_match.group()})
+        result = _mcp_call("jira_get_issue", {"issue_key": issue_match.group()})
         return {"result_type": "issue_detail", "jira_results": [result],
                 "response": f"Details for {issue_match.group()}"}
 
     if any(p in prompt_lower for p in ["list issue", "show issue", "all issue", "show all", "list all"]):
+        # Only treat "in <project>" as a project hint when it appears at the end,
+        # so phrases like "in progress" do not get parsed as project keys.
+        project_hint_match = re.search(r"\bin\s+([a-z][a-z0-9]+)\s*$", prompt_lower)
+        effective_project_key = project_key
+        if project_hint_match:
+            hinted = project_hint_match.group(1).upper().strip()
+            if 1 <= len(hinted) <= 12:
+                effective_project_key = hinted
+
         sprint_match = re.search(r"sprint\s*(\d+)", prompt_lower)
-        jql = f"project={project_key}"
+        jql = f"project={effective_project_key}"
         if sprint_match:
-            jql += f' AND sprint = "{project_key} Sprint {sprint_match.group(1)}"'
+            jql += f' AND sprint = "{effective_project_key} Sprint {sprint_match.group(1)}"'
         if "in progress" in prompt_lower:   jql += ' AND status = "In Progress"'
         elif "to do"      in prompt_lower:  jql += ' AND status = "To Do"'
         elif "done"       in prompt_lower:  jql += ' AND status = "Done"'
         jql += " ORDER BY created DESC"
-        logger.info(f"[FAST] jira_search_issues({jql})")
-        result = jira_search_issues.invoke({"jql": jql, "max_results": 50})
-        issues = result.get("issues", [])
-        return {"issues": issues, "result_type": "issues",
-                "response": f"Found {result.get('total', len(issues))} issue(s)", "jira_results": issues}
+        logger.info(f"[FAST] direct jira_search_issues({jql})")
+        try:
+            data = jira_get_cached("search/jql", params={
+                "jql": jql,
+                "maxResults": 50,
+                "fields": "summary,status,assignee,priority,created,updated,issuetype",
+            })
+            raw_issues = data.get("issues", [])
+            issues = []
+            for item in raw_issues:
+                fields = item.get("fields", {})
+                issues.append({
+                    "key": item.get("key", ""),
+                    "summary": fields.get("summary", ""),
+                    "status": fields.get("status", {}).get("name", ""),
+                    "assignee": fields.get("assignee", {}).get("displayName", "Unassigned") if fields.get("assignee") else "Unassigned",
+                    "priority": fields.get("priority", {}).get("name", "") if fields.get("priority") else "",
+                    "type": fields.get("issuetype", {}).get("name", "") if fields.get("issuetype") else "",
+                    "created": fields.get("created", "")[:10] if fields.get("created") else "",
+                    "updated": fields.get("updated", "")[:10] if fields.get("updated") else "",
+                })
+
+            total = data.get("total", len(issues))
+            return {
+                "issues": issues,
+                "result_type": "issues",
+                "response": f"Found {total} issue(s)",
+                "jira_results": issues,
+            }
+        except Exception as direct_err:
+            logger.warning(f"[FAST] direct jira_search_issues failed, trying MCP fallback: {direct_err}")
+            result = _mcp_call("jira_search_issues", {"jql": jql, "max_results": 50})
+            if result.get("error"):
+                return {
+                    "error": f"Issue lookup failed: {direct_err} | MCP fallback failed: {result.get('error')}",
+                    "response": "Could not fetch issues. Please retry.",
+                }
+            issues = result.get("issues", [])
+            return {
+                "issues": issues,
+                "result_type": "issues",
+                "response": f"Found {result.get('total', len(issues))} issue(s)",
+                "jira_results": issues,
+            }
 
     if any(p in prompt_lower for p in ["who is working", "who has", "assignee breakdown"]):
         logger.info("[FAST] jira_get_project_summary (assignees)")
-        result  = jira_get_project_summary.invoke({"project_key": project_key})
+        result = _mcp_call("jira_get_project_summary", {"project_key": project_key})
         counts  = result.get("assignee_counts", {})
         results = [{"name": k, "count": v} for k, v in counts.items()]
         return {"result_type": "assignees", "jira_results": results,
@@ -379,10 +491,20 @@ def run_jira_agent(prompt: str, project_key: str) -> Dict:
     if not llm:
         return {"error": "LLM not configured", "raw_response": ""}
 
-    tool_map = {t.name: t for t in JIRA_TOOLS}
+    auth_context = get_mcp_auth_context()
+    if not auth_context:
+        return {"error": "Jira auth context is missing", "raw_response": ""}
+
+    try:
+        tool_specs = list_jira_tools()
+    except Exception as e:
+        logger.error(f"MCP tools/list failed: {e}")
+        return {"error": f"MCP unavailable: {e}", "raw_response": ""}
+
+    tool_map = {t.get("name"): t for t in tool_specs if t.get("name")}
     tool_descriptions = "\n".join([
-        f"- {t.name}: {t.description.strip().split(chr(10))[0]}"
-        for t in JIRA_TOOLS
+        f"- {t.get('name')}: {(t.get('description') or '').strip().split(chr(10))[0]}"
+        for t in tool_specs
     ])
 
     system_prompt = f"""You are a Jira assistant. Current project key: {project_key}
@@ -418,9 +540,13 @@ Always use project key: {project_key}
                 tool_args = parsed.get("args", {})
                 if tool_name not in tool_map:
                     return {"raw_response": raw_text}
+                tool_args = tool_args or {}
+                tool_args["auth_context"] = auth_context
+                if tool_name in {"jira_get_sprints", "jira_get_project_summary", "jira_get_my_issues", "jira_create_issue"}:
+                    tool_args.setdefault("project_key", project_key)
                 logger.info(f"MCP tool call: {tool_name}({tool_args})")
                 try:
-                    tool_result = tool_map[tool_name].invoke(tool_args)
+                    tool_result = call_jira_tool(tool_name, tool_args)
                     tool_results.append({"tool": tool_name, "result": tool_result})
                     messages.append(response)
                     messages.append(HumanMessage(
@@ -453,37 +579,97 @@ Always use project key: {project_key}
 # ══════════════════════════════════════════════════════════════════════════════
 
 def generate_chart_b64(chart_type: str, title: str, labels: list, values: list) -> str:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    colors  = sns.color_palette("husl", max(len(labels), 1))
+    palette = ["#0f9d8a", "#2f80ed", "#ff6b4a", "#f0b429", "#5b6cff", "#2eaf74"]
+    labels = labels or ["No Data"]
+    raw_values = values or [0]
+    numeric_values = []
+    for v in raw_values:
+        try:
+            numeric_values.append(float(v))
+        except Exception:
+            numeric_values.append(0.0)
+
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=150)
+    fig.patch.set_facecolor("#f8fafc")
+    ax.set_facecolor("#ffffff")
+
+    colors = [palette[i % len(palette)] for i in range(max(len(labels), 1))]
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#d9e2ef")
+    ax.spines["bottom"].set_color("#d9e2ef")
 
     if chart_type == "pie":
-        ax.pie(values, labels=labels, autopct="%1.1f%%", colors=colors, startangle=90)
-        ax.set_title(title, fontsize=14, fontweight="bold")
+        total = sum(numeric_values)
+        pie_values = numeric_values if total > 0 else [1]
+        pie_labels = labels if total > 0 else ["No Data"]
+        ax.pie(
+            pie_values,
+            labels=pie_labels,
+            autopct="%1.1f%%" if total > 0 else None,
+            colors=colors[:len(pie_labels)],
+            startangle=90,
+            wedgeprops={"width": 0.55, "edgecolor": "white", "linewidth": 2},
+            textprops={"fontsize": 10, "color": "#24344d"},
+        )
+        ax.set_title(title, fontsize=16, fontweight="bold", color="#152238", pad=16)
+
     elif chart_type == "line":
-        ax.plot(labels, values, marker="o", linewidth=2, markersize=8)
-        ax.set_title(title, fontsize=14, fontweight="bold")
-        ax.set_xlabel("Categories"); ax.set_ylabel("Values")
-        ax.grid(True, alpha=0.3); plt.xticks(rotation=45)
+        ax.plot(labels, numeric_values, marker="o", linewidth=3, markersize=7, color=palette[1])
+        ax.fill_between(range(len(labels)), numeric_values, color=palette[1], alpha=0.14)
+        ax.set_title(title, fontsize=16, fontweight="bold", color="#152238", pad=12)
+        ax.set_xlabel("Categories", color="#66758f", fontsize=11)
+        ax.set_ylabel("Values", color="#66758f", fontsize=11)
+        ax.tick_params(axis="x", rotation=28, labelsize=10)
+        ax.tick_params(axis="y", labelsize=10)
+        ax.grid(axis="y", alpha=0.25, linestyle="--")
+
     elif chart_type == "metrics":
         ax.axis("off")
-        for i, (label, value) in enumerate(zip(labels, values)):
-            ax.text(0.5, 0.85 - i * 0.18, f"{label}: {value}",
-                ha="center", va="center", fontsize=16, fontweight="bold",
-                bbox=dict(boxstyle="round", facecolor=colors[i % len(colors)], alpha=0.3),
-                transform=ax.transAxes)
-        ax.set_title(title, fontsize=14, fontweight="bold")
-    else:
-        bars = ax.bar(labels, values, color=colors)
-        ax.set_title(title, fontsize=14, fontweight="bold")
-        ax.set_xlabel("Categories"); ax.set_ylabel("Values")
-        plt.xticks(rotation=45)
-        for bar, value in zip(bars, values):
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                str(value), ha="center", va="bottom", fontsize=10)
+        ax.set_title(title, fontsize=16, fontweight="bold", color="#152238", pad=10)
+        for i, (label, value) in enumerate(zip(labels, raw_values)):
+            ax.text(
+                0.5,
+                0.84 - i * 0.18,
+                f"{label}: {value}",
+                ha="center",
+                va="center",
+                fontsize=15,
+                fontweight="bold",
+                color="#1f2f46",
+                bbox={
+                    "boxstyle": "round,pad=0.45",
+                    "facecolor": colors[i % len(colors)],
+                    "edgecolor": "none",
+                    "alpha": 0.18,
+                },
+                transform=ax.transAxes,
+            )
 
-    plt.tight_layout()
+    else:
+        bars = ax.bar(labels, numeric_values, color=colors[:len(labels)], edgecolor="none")
+        ax.set_title(title, fontsize=16, fontweight="bold", color="#152238", pad=12)
+        ax.set_xlabel("Categories", color="#66758f", fontsize=11)
+        ax.set_ylabel("Values", color="#66758f", fontsize=11)
+        ax.tick_params(axis="x", rotation=28, labelsize=10)
+        ax.tick_params(axis="y", labelsize=10)
+        ax.grid(axis="y", alpha=0.25, linestyle="--")
+        y_max = max(numeric_values) if numeric_values else 0
+        pad = max(y_max * 0.02, 0.5)
+        for bar, value in zip(bars, raw_values):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + pad,
+                str(value),
+                ha="center",
+                va="bottom",
+                fontsize=10,
+                color="#24344d",
+            )
+
+    plt.tight_layout(pad=1.1)
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(); buf.seek(0)
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
@@ -517,6 +703,182 @@ def extract_chart_data(agent_result: dict, prompt: str, project_key: str) -> Opt
             counts = agent_result.get(selected_key, agent_result[key])
             return {"title": title_template, "labels": list(counts.keys()), "values": list(counts.values())}
     return None
+
+
+def ensure_jira_chart_data_for_export(prompt: str, project_key: str, agent_result: dict) -> Optional[Dict]:
+    """
+    For exports, ensure we fetch REAL Jira data.
+    Tries multiple strategies to get real data instead of dummy data.
+    """
+    if not project_key:
+        return None
+    
+    # Try to extract from agent result first
+    chart_data = extract_chart_data(agent_result, prompt, project_key)
+    if chart_data:
+        logger.info(f"[EXPORT] Using Jira data from agent result")
+        return chart_data
+    
+    # If not found, call project summary directly
+    try:
+        auth_context = get_mcp_auth_context()
+        if auth_context:
+            summary = call_jira_tool(
+                "jira_get_project_summary",
+                {
+                    "auth_context": auth_context,
+                    "project_key": project_key,
+                },
+            )
+            logger.info(f"[EXPORT] Fetched project summary for {project_key}")
+            chart_data = extract_chart_data(summary, prompt, project_key)
+            if chart_data:
+                logger.info(f"[EXPORT] Using Jira data from project summary")
+                return chart_data
+    except Exception as e:
+        logger.warning(f"[EXPORT] Failed to fetch project summary: {e}")
+    
+    # Alternative: search for issues and aggregate by status
+    try:
+        if get_jira_auth():
+            data = jira_get_cached("search/jql", params={
+                "jql": f"project={project_key} ORDER BY created DESC",
+                "maxResults": 100,
+                "fields": "status,priority,assignee,issuetype",
+            })
+            logger.info(f"[EXPORT] Fetched {data.get('total', 0)} issues from Jira")
+            
+            # Aggregate by status
+            status_counts = {}
+            for issue in data.get("issues", []):
+                status_name = issue.get("fields", {}).get("status", {}).get("name", "Unknown")
+                status_counts[status_name] = status_counts.get(status_name, 0) + 1
+            
+            if status_counts:
+                logger.info(f"[EXPORT] Using aggregated status data: {status_counts}")
+                return {
+                    "title": f"{project_key} — Issue Status",
+                    "labels": list(status_counts.keys()),
+                    "values": list(status_counts.values())
+                }
+    except Exception as e:
+        logger.warning(f"[EXPORT] Failed to aggregate issues by status: {e}")
+    
+    logger.warning(f"[EXPORT] No real Jira data found for {project_key}")
+    return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Excel Export with Chart
+# ══════════════════════════════════════════════════════════════════════════════
+
+def create_excel_with_chart(chart_data: dict, chart_config: dict, project_key: str = "") -> BytesIO:
+    """
+    Create an Excel file with:
+    - Sheet 1: Aggregated data from chart (status counts, etc.)
+    - Sheet 2: Detailed Jira issues
+    - Sheet 3: Chart image embedded
+    """
+    from openpyxl.styles import Font, Alignment
+    
+    # Create workbook
+    wb = Workbook()
+    ws_summary = wb.active
+    ws_summary.title = "Summary"
+    
+    # Add summary headers
+    ws_summary['A1'] = "Category"
+    ws_summary['B1'] = "Count"
+    ws_summary['A1'].font = Font(bold=True, size=12)
+    ws_summary['B1'].font = Font(bold=True, size=12)
+    ws_summary['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_summary['B1'].alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Add summary data rows
+    labels = chart_data.get("labels", [])
+    values = chart_data.get("values", [])
+    for idx, (label, value) in enumerate(zip(labels, values), start=2):
+        ws_summary[f'A{idx}'] = label
+        ws_summary[f'B{idx}'] = value
+    
+    ws_summary.column_dimensions['A'].width = 25
+    ws_summary.column_dimensions['B'].width = 15
+    
+    # Add detailed Jira issues sheet
+    ws_issues = wb.create_sheet("Jira Issues")
+    ws_issues['A1'] = "Issue Key"
+    ws_issues['B1'] = "Summary"
+    ws_issues['C1'] = "Status"
+    ws_issues['D1'] = "Assignee"
+    ws_issues['E1'] = "Priority"
+    ws_issues['F1'] = "Type"
+    ws_issues['G1'] = "Created"
+    
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G']:
+        ws_issues[f'{col}1'].font = Font(bold=True, size=11)
+        ws_issues[f'{col}1'].alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Fetch detailed issues from Jira
+    try:
+        if project_key and get_jira_auth():
+            data = jira_get_cached("search/jql", params={
+                "jql": f"project={project_key} ORDER BY created DESC",
+                "maxResults": 50,
+                "fields": "key,summary,status,assignee,priority,issuetype,created",
+            })
+            
+            row = 2
+            for issue in data.get("issues", []):
+                fields = issue.get("fields", {})
+                ws_issues[f'A{row}'] = issue.get("key", "")
+                ws_issues[f'B{row}'] = fields.get("summary", "")
+                ws_issues[f'C{row}'] = fields.get("status", {}).get("name", "")
+                ws_issues[f'D{row}'] = fields.get("assignee", {}).get("displayName", "Unassigned") if fields.get("assignee") else "Unassigned"
+                ws_issues[f'E{row}'] = fields.get("priority", {}).get("name", "") if fields.get("priority") else ""
+                ws_issues[f'F{row}'] = fields.get("issuetype", {}).get("name", "") if fields.get("issuetype") else ""
+                ws_issues[f'G{row}'] = fields.get("created", "")[:10] if fields.get("created") else ""
+                row += 1
+            
+            logger.info(f"[EXCEL] Added {row - 2} detailed Jira issues for {project_key}")
+    except Exception as e:
+        logger.warning(f"Could not fetch detailed Jira issues for {project_key}: {e}")
+    
+    # Adjust column widths for issues sheet
+    ws_issues.column_dimensions['A'].width = 12
+    ws_issues.column_dimensions['B'].width = 35
+    ws_issues.column_dimensions['C'].width = 15
+    ws_issues.column_dimensions['D'].width = 20
+    ws_issues.column_dimensions['E'].width = 12
+    ws_issues.column_dimensions['F'].width = 12
+    ws_issues.column_dimensions['G'].width = 12
+    
+    # Add chart image to third sheet
+    if chart_config.get("image_base64"):
+        ws_chart = wb.create_sheet("Chart")
+        
+        try:
+            # Decode base64 image
+            img_b64 = chart_config["image_base64"]
+            if img_b64.startswith("data:image/png;base64,"):
+                img_b64 = img_b64.replace("data:image/png;base64,", "")
+            
+            img_data = BytesIO(base64.b64decode(img_b64))
+            img_data.seek(0)
+            
+            # Add image to worksheet
+            img = XLImage(img_data)
+            img.width = 600
+            img.height = 400
+            ws_chart.add_image(img, "A1")
+            logger.info(f"Chart image embedded in Excel export")
+        except Exception as e:
+            logger.warning(f"Could not embed chart image in Excel: {e}")
+    
+    # Save to BytesIO
+    excel_buf = BytesIO()
+    wb.save(excel_buf)
+    excel_buf.seek(0)
+    return excel_buf
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -562,12 +924,21 @@ def process_prompt(prompt: str) -> Dict:
 
     # Chart path
     if wants_chart:
-        chart_data = extract_chart_data(agent_result, prompt, project_key)
+        # For exports, prioritize real Jira data
+        if wants_export:
+            chart_data = ensure_jira_chart_data_for_export(prompt, project_key, agent_result)
+        else:
+            chart_data = extract_chart_data(agent_result, prompt, project_key)
 
         if not chart_data and jira_ok:
             try:
-                from mcp_tools import jira_get_project_summary
-                summary    = jira_get_project_summary.invoke({"project_key": project_key})
+                summary = call_jira_tool(
+                    "jira_get_project_summary",
+                    {
+                        "auth_context": get_mcp_auth_context() or {},
+                        "project_key": project_key,
+                    },
+                )
                 chart_data = extract_chart_data(summary, prompt, project_key)
             except Exception as e:
                 logger.warning(f"Project summary fallback failed: {e}")
@@ -583,6 +954,7 @@ def process_prompt(prompt: str) -> Dict:
                 pass
 
         if not chart_data:
+            logger.warning(f"[CHART] Using dummy data - no real Jira data available")
             chart_data = {"title": "Sample Distribution",
                           "labels": ["A", "B", "C", "D"], "values": [35, 25, 25, 15]}
 
@@ -611,15 +983,14 @@ def process_prompt(prompt: str) -> Dict:
         result = {"response": f"{chart_type.upper()} chart generated.", "chart_config": chart_config}
 
         if wants_export:
-            df  = pd.DataFrame({"Category": chart_data["labels"], "Value": chart_data["values"]})
-            buf = BytesIO()
-            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, sheet_name="Dashboard Data")
-            buf.seek(0)
+            logger.info(f"[EXPORT] Creating Excel with chart data: {len(chart_data.get('labels', []))} items")
+            excel_buf = create_excel_with_chart(chart_data, chart_config, project_key)
             chart_config["export_format"] = "excel"
-            chart_config["export_data"]   = base64.b64encode(buf.getvalue()).decode()
+            chart_config["export_data"]   = base64.b64encode(excel_buf.getvalue()).decode()
             result["auto_export"]  = True
             result["dashboard_id"] = chart_id
+            result["data_source"]  = chart_config.get("data_source", "generated")
+            logger.info(f"[EXPORT] Excel file generated successfully (dashboard_id: {chart_id})")
 
         return result
 
@@ -679,7 +1050,7 @@ def auth_login():
         f"https://auth.atlassian.com/authorize"
         f"?audience=api.atlassian.com"
         f"&client_id={os.getenv('JIRA_CLIENT_ID')}"
-        f"&scope=read%3Ajira-work%20write%3Ajira-work%20read%3Ajira-user%20offline_access"
+        f"&scope={requests.utils.quote(JIRA_OAUTH_SCOPES, safe='')}"
         f"&redirect_uri={requests.utils.quote(redirect_uri, safe='')}"
         f"&state={state}"
         f"&response_type=code"
@@ -777,7 +1148,8 @@ def auth_callback():
             session["jira_cloud_id"]  = sites[0]["id"]
             session["jira_site_name"] = sites[0]["name"]
             session["jira_site_url"]  = sites[0].get("url", "")
-            return redirect(url_for("select_project"))
+            ensure_selected_project()
+            return redirect(url_for("index"))
 
         # Multiple sites — let user pick
         return redirect(url_for("select_site"))
@@ -808,7 +1180,8 @@ def select_site_post():
     session["jira_cloud_id"]  = cloud_id
     session["jira_site_name"] = site["name"]
     session["jira_site_url"]  = site.get("url", "")
-    return redirect(url_for("select_project"))
+    ensure_selected_project()
+    return redirect(url_for("index"))
 
 
 @app.route("/select-project")
@@ -833,6 +1206,31 @@ def select_project_post():
     session["project_key"]  = project_key
     session["project_name"] = project_name
     return redirect(url_for("index"))
+
+
+@app.route("/api/project/select", methods=["POST"])
+@login_required
+def select_project_api():
+    payload = request.get_json() or {}
+    requested_key = (payload.get("project_key") or "").upper().strip()
+    if not requested_key:
+        return jsonify({"error": "project_key required"}), 400
+
+    token = session.get("oauth_token", {})
+    cloud_id = session.get("jira_cloud_id")
+    projects = fetch_user_projects(cloud_id, token.get("access_token", ""))
+    selected = next((p for p in projects if (p.get("key") or "").upper() == requested_key), None)
+    if not selected:
+        return jsonify({"error": f"Project {requested_key} not found or no access"}), 404
+
+    session["project_key"] = selected.get("key", requested_key)
+    session["project_name"] = selected.get("name", "")
+    clear_user_cache()
+    return jsonify({
+        "message": "Project selected",
+        "project_key": session.get("project_key", ""),
+        "project_name": session.get("project_name", ""),
+    })
 
 
 @app.route("/auth/status")
@@ -872,6 +1270,8 @@ def auth_logout():
 @app.route("/")
 @login_required
 def index():
+    if session.get("jira_cloud_id") and not get_user_project_key():
+        ensure_selected_project()
     return render_template("index.html",
         user=current_user(),
         site=session.get("jira_site_name", ""),
@@ -889,6 +1289,9 @@ def generate_dashboard():
         return jsonify({"error": "Prompt is required"}), 400
 
     result = process_prompt(prompt)
+
+    if result.get("error") and not result.get("needs_project"):
+        return jsonify(result), 400
 
     if result.get("chart_config"):
         dash_id = result["chart_config"]["chart_id"]
@@ -1007,6 +1410,73 @@ def create_jira_task():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/jira/tasks/<task_id>/edit-data", methods=["GET"])
+@login_required
+def get_jira_task_edit_data(task_id):
+    if not get_jira_auth():
+        return jsonify({"error": "Jira not connected"}), 503
+
+    try:
+        issue = jira_get(f"issue/{task_id}", params={"fields": "summary,status,assignee,priority"})
+        fields = issue.get("fields", {})
+
+        current = {
+            "summary": fields.get("summary", ""),
+            "status": fields.get("status", {}).get("name", "") if fields.get("status") else "",
+            "assignee": {
+                "accountId": fields.get("assignee", {}).get("accountId", "") if fields.get("assignee") else "",
+                "displayName": fields.get("assignee", {}).get("displayName", "Unassigned") if fields.get("assignee") else "Unassigned",
+            },
+            "priority": fields.get("priority", {}).get("name", "") if fields.get("priority") else "",
+        }
+
+        transitions_data = jira_get(f"issue/{task_id}/transitions")
+        transitions = [
+            {"id": t.get("id", ""), "name": t.get("name", "")}
+            for t in transitions_data.get("transitions", [])
+        ]
+
+        assignable_raw = jira_get("user/assignable/search", params={"issueKey": task_id, "maxResults": 100})
+        assignable_users = assignable_raw if isinstance(assignable_raw, list) else []
+        assignees = [
+            {
+                "accountId": u.get("accountId", ""),
+                "displayName": u.get("displayName", "Unknown User"),
+            }
+            for u in assignable_users
+            if u.get("accountId")
+        ]
+
+        priority_names = []
+        try:
+            editmeta = jira_get(f"issue/{task_id}/editmeta")
+            allowed_values = (
+                editmeta.get("fields", {})
+                .get("priority", {})
+                .get("allowedValues", [])
+            )
+            priority_names = [p.get("name", "") for p in allowed_values if p.get("name")]
+        except Exception:
+            # Keep endpoint resilient even if editmeta is restricted.
+            priority_names = []
+
+        if not priority_names:
+            priority_names = ["Lowest", "Low", "Medium", "High", "Highest"]
+
+        if current["priority"] and current["priority"] not in priority_names:
+            priority_names.insert(0, current["priority"])
+
+        return jsonify({
+            "task_id": task_id,
+            "current": current,
+            "assignees": assignees,
+            "priorities": priority_names,
+            "statuses": transitions,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/jira/tasks/<task_id>", methods=["PUT"])
 @login_required
 def update_jira_task(task_id):
@@ -1015,11 +1485,22 @@ def update_jira_task(task_id):
     data = request.get_json()
     try:
         fields = {}
+        if "summary" in data:
+            fields["summary"] = data.get("summary", "")
+
+        if "assignee_account_id" in data:
+            account_id = (data.get("assignee_account_id") or "").strip()
+            fields["assignee"] = {"accountId": account_id} if account_id else None
+
         if "priority" in data:    fields["priority"]    = {"name": data["priority"]}
         if "description" in data: fields["description"] = {"type": "doc", "version": 1, "content": [
             {"type": "paragraph", "content": [{"type": "text", "text": data["description"]}]}]}
+
         if fields:
             jira_put(f"issue/{task_id}", {"fields": fields})
+
+        if "status_id" in data and data.get("status_id"):
+            jira_post(f"issue/{task_id}/transitions", {"transition": {"id": str(data.get("status_id"))}})
         if "status" in data:
             trans   = jira_get(f"issue/{task_id}/transitions")
             matched = next((t for t in trans.get("transitions", []) if t["name"].lower() == data["status"].lower()), None)
@@ -1037,14 +1518,21 @@ def export_dashboard(dashboard_id):
     dashes = get_user_dashboards()
     if dashboard_id not in dashes:
         return jsonify({"error": "Not found"}), 404
-    cfg = dashes[dashboard_id].get("chart_config", {})
-    df  = pd.DataFrame({"Category": cfg.get("labels", []), "Value": cfg.get("values", []),
-                         "Title": cfg.get("title", ""), "Type": cfg.get("chart_type", "")})
-    buf = BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Dashboard Data")
-    buf.seek(0)
-    return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    
+    dash = dashes[dashboard_id]
+    cfg = dash.get("chart_config", {})
+    project_key = get_user_project_key()
+    
+    # Prepare chart data
+    chart_data = {
+        "labels": cfg.get("labels", []),
+        "values": cfg.get("values", []),
+    }
+    
+    # Create Excel with data table and chart image
+    excel_buf = create_excel_with_chart(chart_data, cfg, project_key)
+    
+    return send_file(excel_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                      as_attachment=True, download_name=f"dashboard_{dashboard_id}.xlsx")
 
 
@@ -1061,11 +1549,13 @@ def get_metrics():
 
 # ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
     print("=" * 60)
     print("  Dashboard Generator — Multi-Tenant Edition")
     print("=" * 60)
     print(f"  OAuth Client : {os.getenv('JIRA_CLIENT_ID','Not set')}")
     print(f"  LLM Model    : {os.getenv('QWEN_MODEL','Not set')}")
-    print(f"  Login URL    : http://localhost:5000/login")
+    print(f"  Login URL    : http://localhost:{port}/login")
     print("=" * 60)
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=debug, host="0.0.0.0", port=port)
