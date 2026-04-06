@@ -1,162 +1,122 @@
-# Dynamic Dashboard Generation
+# JIRA Dashboard Generator
 
-AI-powered dashboard generation using LangGraph, LLM, and Qwen Jira MCP integration.
+Dynamic Jira dashboard generation with OAuth login, project switching, chart creation, Jira issue actions, and Excel export.
 
 ## Features
 
-✅ **Dynamic Chart Generation**
-- Pie charts
-- Bar charts  
-- Line charts
-- Metrics/KPI dashboards
+- Jira OAuth login (Atlassian)
+- Multi-tenant session isolation per logged-in user
+- Site selection and project selection
+- Dynamic chart generation:
+	- Pie
+	- Bar
+	- Line
+	- Metrics
+- Jira operations:
+	- List issues
+	- Get issue details
+	- Get sprint list
+	- Project summary breakdowns
+	- Create and update issues
+- Export to Excel:
+	- Summary sheet
+	- Jira Issues sheet (detailed issue rows)
+	- Chart image sheet
 
-✅ **Create & Update**
-- Natural language prompts to create dashboards
-- Update existing dashboards with new prompts
+## Tech Stack
 
-✅ **Jira Task Assignment**
-- Create Jira tasks from dashboards
-- Assign tasks to team members
-- Track task status and priority
+- Backend: Flask
+- Auth: Authlib (Atlassian OAuth)
+- LLM: LangChain OpenAI-compatible client
+- Jira integration: MCP stdio server/client
+- Charts: Matplotlib + Seaborn
+- Data export: Pandas + OpenPyXL
+- Frontend: Jinja templates + Vanilla JS
 
-✅ **Excel Export**
-- Export dashboard data to Excel (.xlsx)
-- Export to CSV format
-- Includes metadata and timestamps
+## Project Structure
 
-## Installation
+```text
+JIRA-Dashboard/
+├── server.py
+├── jira_mcp_server.py
+├── mcp_client.py
+├── requirements.txt
+├── templates/
+│   ├── index.html
+│   ├── login.html
+│   ├── select_site.html
+│   └── select_project.html
+└── static/
+```
 
-1. **Install dependencies:**
+## Setup
+
+1. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-2. **Set environment variables (optional):**
+2. Configure environment variables:
+
 ```bash
-export OPENAI_API_KEY='your-api-key'
+# Flask
+export FLASK_SECRET_KEY="replace-me"
+
+# OAuth (Atlassian)
+export JIRA_CLIENT_ID="your-client-id"
+export JIRA_CLIENT_SECRET="your-client-secret"
+
+# LLM (OpenAI-compatible endpoint)
+export QWEN_API_KEY="your-llm-key"
+export QWEN_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+export QWEN_MODEL="qwen-plus"
+export QWEN_MODEL_FAST="qwen-plus"
+
+# Optional API token fallback (when OAuth is not used)
+export JIRA_SERVER="https://your-domain.atlassian.net"
+export JIRA_USER_EMAIL="you@example.com"
+export JIRA_API_TOKEN="your-api-token"
 ```
 
-3. **Run the server:**
+3. Run server:
+
 ```bash
 python server.py
 ```
 
-4. **Access the application:**
-Open your browser and navigate to: `http://localhost:5000`
+4. Open:
 
-## Usage Examples
-
-### Create Charts
-
-**Pie Chart:**
-```
-Create a pie chart showing sales distribution by region
+```text
+http://localhost:5000/login
 ```
 
-**Bar Chart:**
-```
-Generate a bar chart for quarterly revenue performance
-```
+## Main Endpoints
 
-**Metrics Dashboard:**
-```
-Show team metrics with KPIs for each department
-```
-
-### Export Data
-
-```
-Create a sales chart and export to Excel
-```
-
-### Jira Integration
-
-```
-Create a dashboard and assign a Jira task to track progress
-```
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/generate` | POST | Generate dashboard from prompt |
-| `/api/dashboards` | GET | List all dashboards |
-| `/api/dashboard/<id>` | GET | Get specific dashboard |
-| `/api/dashboard/<id>` | PUT | Update dashboard |
-| `/api/export/<id>` | GET | Export dashboard to Excel |
-| `/api/jira/tasks` | GET | List Jira tasks |
-| `/api/jira/tasks` | POST | Create Jira task |
-| `/api/jira/tasks/<id>` | PUT | Update Jira task |
-| `/api/metrics` | GET | Get system metrics |
-
-## Architecture
-
-### LangGraph Workflow
-
-The application uses a LangGraph-based state machine with the following nodes:
-
-1. **Parse Intent** - Detects user intent (create, update, export, jira)
-2. **Extract Data** - Identifies data source and requirements
-3. **Generate Chart** - Creates visualization (pie, bar, line, metrics)
-4. **Handle Jira** - Creates/assigns Jira tasks via MCP
-5. **Export Data** - Exports to Excel/CSV format
-6. **Format Response** - Returns formatted response to user
-
-### Technology Stack
-
-- **Backend:** Flask + LangGraph
-- **LLM:** OpenAI GPT-4 (via LangChain)
-- **Visualization:** Matplotlib + Seaborn
-- **Data Processing:** Pandas
-- **Frontend:** Bootstrap 5 + Vanilla JS
-- **Jira Integration:** MCP Server (simulated in demo)
-
-## Project Structure
-
-```
-DASHBOARD_GENERATION/
-├── server.py              # Main Flask application
-├── requirements.txt       # Python dependencies
-├── README.md             # This file
-├── templates/
-│   └── index.html        # Frontend UI
-├── static/
-│   ├── charts/          # Generated chart images
-│   ├── css/             # Custom stylesheets
-│   └── js/              # Custom JavaScript
-└── .env                 # Environment variables (optional)
-```
+- `GET /` - Dashboard UI
+- `POST /api/generate` - Prompt-driven chart/issue actions
+- `GET /api/dashboards` - List dashboards for current user
+- `GET /api/dashboard/<dashboard_id>` - Get dashboard
+- `PUT /api/dashboard/<dashboard_id>` - Update dashboard prompt
+- `GET /api/export/<dashboard_id>` - Export dashboard Excel
+- `GET /api/jira/projects` - List projects for selected site
+- `POST /api/project/select` - Switch active Jira project
+- `GET /api/jira/tasks` - List tasks
+- `POST /api/jira/tasks` - Create task
+- `PUT /api/jira/tasks/<task_id>` - Update task
+- `GET /api/metrics` - Chart usage metrics
 
 ## Example Prompts
 
-Try these example prompts in the application:
+- `Create a pie chart for SCRUM issue status and export to excel`
+- `List all issues in SCRUM`
+- `Show sprint list for SCRUM`
+- `Who is working in SCRUM`
+- `Create task: Fix login flow in SCRUM`
+- `Show details of SCRUM-123`
 
-1. "Create a pie chart showing project status distribution"
-2. "Generate a bar chart for quarterly sales performance"
-3. "Show team metrics dashboard with KPIs"
-4. "Create sales chart and export to Excel"
-5. "Update the chart to show monthly instead of quarterly data"
-6. "Assign a Jira task to track this dashboard"
+## Notes
 
-## Jira MCP Integration
-
-For production Jira integration:
-
-1. Set up Jira MCP server
-2. Configure Jira credentials in environment:
-```bash
-export JIRA_API_TOKEN='your-token'
-export JIRA_SERVER='https://your-domain.atlassian.net'
-export JIRA_USER_EMAIL='your-email'
-export JIRA_PROJECT_KEY='PROJ'
-```
-
-3. Update the `handle_jira` method in `server.py` to use actual Jira API calls
-
-## License
-
-MIT License
-
-## Support
-
-For issues and feature requests, please create an issue in the repository.
+- Project-aware prompt buttons and Jira panels in UI use the currently selected project.
+- Excel export includes both aggregated chart data and detailed Jira issue rows.
+- If dependencies are missing, ensure you run with the same Python interpreter where requirements were installed.
