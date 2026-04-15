@@ -2,3 +2,9 @@
 *~
 __pycache__/
 .env
+
+# local artifacts
+server.log
+venv311/
+.DS_Store
+**/.DS_Store
