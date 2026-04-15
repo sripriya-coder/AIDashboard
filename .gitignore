@@ -1,10 +1,10 @@
-*.log
-*~
-__pycache__/
 .env
-
-# local artifacts
-server.log
 venv311/
+__pycache__/
+*.pyc
+*.pyo
+server.log
+*.log
 .DS_Store
-**/.DS_Store
+static/charts/
+templates/index\ copy.html
