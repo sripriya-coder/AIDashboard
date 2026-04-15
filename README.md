@@ -292,3 +292,4 @@ Delivery intelligence:
 - Add automated tests for prompt routing and intelligence endpoints
 - Add role-aware access controls if the app is used beyond internal demo environments
 - Add rate limiting and structured audit logging for production deployment
+# AIDashboard
