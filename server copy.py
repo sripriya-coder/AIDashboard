@@ -11,7 +11,6 @@ import uuid
 import logging
 import time
 import hashlib
-from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Dict, List, Any, Optional
@@ -31,7 +30,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
-import plotly.graph_objects as go
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -46,80 +44,14 @@ from flask_session import Session
 
 # ── Env + logging ─────────────────────────────────────────────────────────────
 load_dotenv()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
-LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.log")
-
-logger = logging.getLogger("jira_dashboard")
-logger.setLevel(logging.INFO)
-logger.propagate = False
-
-# Configure handlers once so reload/import cycles do not duplicate log lines.
-if not logger.handlers:
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=5 * 1024 * 1024,
-        backupCount=3,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-
-def env_float(name: str, default: float, min_value: float = 0.0) -> float:
-    """Read float environment values safely with lower-bound clamping."""
-    raw = os.getenv(name)
-    if raw is None or str(raw).strip() == "":
-        return max(default, min_value)
-    try:
-        return max(float(raw), min_value)
-    except Exception:
-        logger.warning("Invalid float for %s=%r, using default=%s", name, raw, default)
-        return max(default, min_value)
-
-
-def env_int(name: str, default: int, min_value: int = 0) -> int:
-    """Read integer environment values safely with lower-bound clamping."""
-    raw = os.getenv(name)
-    if raw is None or str(raw).strip() == "":
-        return max(default, min_value)
-    try:
-        return max(int(raw), min_value)
-    except Exception:
-        logger.warning("Invalid int for %s=%r, using default=%s", name, raw, default)
-        return max(default, min_value)
-
-JIRA_OAUTH_SCOPES = " ".join([
-    "read:jira-work",
-    "write:jira-work",
-    "read:jira-user",
-    "read:project:jira",
-    "read:issue-details:jira",
-    "read:jql:jira",
-    "read:board-scope:jira-software",
-    "read:sprint:jira-software",
-    "offline_access",
-])
+JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user read:board-scope:jira-software read:sprint:jira-software offline_access"
+#JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user read:board-scope:jira-software read:sprint:jira-software offline_access"JIRA_OAUTH_SCOPES = "read:jira-work write:jira-work read:jira-user offline_access"
 
 # ── Flask ─────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-
-# Keep Flask and werkzeug request logs flowing into the same handlers/file.
-app.logger.handlers = logger.handlers[:]
-app.logger.setLevel(logging.INFO)
-app.logger.propagate = False
-werkzeug_logger = logging.getLogger("werkzeug")
-werkzeug_logger.setLevel(logging.INFO)
-werkzeug_logger.handlers = logger.handlers[:]
-werkzeug_logger.propagate = False
-
 # IMPORTANT: Must be a fixed key — os.urandom() changes on restart and breaks OAuth state
 _default_secret = "jira-dashboard-secret-key-change-this-in-production-2026"
 app.secret_key = os.getenv("FLASK_SECRET_KEY", _default_secret)
@@ -208,32 +140,6 @@ def save_user_dashboard(dash_id: str, data: Dict):
     if uid not in _user_dashboards:
         _user_dashboards[uid] = {}
     _user_dashboards[uid][dash_id] = data
-
-
-def get_conversation_history() -> List[Dict]:
-    """Get conversation history for current user (last 10 turns)."""
-    uid = user_id()
-    if not uid or uid not in _user_dashboards:
-        return []
-    return _user_dashboards[uid].get("__conversation__", [])
-
-
-def append_conversation(role: str, content: str):
-    """Append message to conversation history, keep last 10 turns."""
-    uid = user_id()
-    if not uid:
-        return
-    if uid not in _user_dashboards:
-        _user_dashboards[uid] = {}
-    
-    history = _user_dashboards[uid].get("__conversation__", [])
-    history.append({
-        "role": role,
-        "content": content,
-        "ts": datetime.now().isoformat()
-    })
-    # Keep last 10 turns
-    _user_dashboards[uid]["__conversation__"] = history[-10:]
 
 
 # ── login_required decorator ──────────────────────────────────────────────────
@@ -344,228 +250,6 @@ def jira_get_cached(path: str, params: dict = None) -> dict:
     return data
 
 
-def jira_agile_get(path: str, params: dict = None) -> dict:
-    """GET from Jira Agile/Software API (boards, sprints)."""
-    cfg = get_jira_auth()
-    if not cfg:
-        raise ValueError("Not authenticated with Jira")
-    # For OAuth the agile base uses the same cloud proxy, just different path prefix
-    base = cfg["base_url"]
-    url = f"{base}/rest/agile/1.0/{path.lstrip('/')}"
-    resp = requests.get(url, auth=cfg.get("auth"), headers=cfg["headers"], params=params, timeout=20)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def select_sprint_board(boards: List[Dict[str, Any]], project_key: str) -> Optional[Dict[str, Any]]:
-    """Prefer Scrum boards that explicitly belong to the current project."""
-    if not boards:
-        return None
-
-    scrum_boards = [board for board in boards if (board.get("type") or "").lower() == "scrum"]
-    if len(scrum_boards) == 1:
-        return scrum_boards[0]
-
-    if scrum_boards:
-        for board in scrum_boards:
-            location = board.get("location") or {}
-            if (location.get("projectKey") or "").upper() == project_key.upper():
-                return board
-        return scrum_boards[0]
-
-    for board in boards:
-        location = board.get("location") or {}
-        if (location.get("projectKey") or "").upper() == project_key.upper():
-            return board
-
-    return boards[0]
-
-
-def _coerce_sprint_list(value: Any) -> List[Dict[str, Any]]:
-    if isinstance(value, dict):
-        return [value]
-    if isinstance(value, list):
-        return [item for item in value if isinstance(item, dict)]
-    return []
-
-
-def _extract_issue_sprints(fields: Dict[str, Any]) -> List[Dict[str, Any]]:
-    seen_ids = set()
-    sprints: List[Dict[str, Any]] = []
-
-    for sprint in _coerce_sprint_list(fields.get("closedSprints")) + _coerce_sprint_list(fields.get("sprint")):
-        sprint_id = sprint.get("id")
-        if sprint_id in seen_ids:
-            continue
-        seen_ids.add(sprint_id)
-        sprints.append(sprint)
-
-    return sprints
-
-
-def _format_sprint_label(name: str, sprint_id: Any) -> str:
-    sprint_name = name or f"Sprint {sprint_id}"
-    return sprint_name.split(" ")[-1] if len(sprint_name) > 12 else sprint_name
-
-
-def build_simple_board_velocity(board_id: Any, project_key: str) -> List[Dict[str, Any]]:
-    """Approximate sprint velocity for simple boards using issue-level sprint fields."""
-    issue_data = jira_agile_get(
-        f"board/{board_id}/issue",
-        params={"maxResults": 200, "fields": "status,sprint,closedSprints"},
-    )
-    board_issues = issue_data.get("issues", [])
-    sprint_map: Dict[str, Dict[str, Any]] = {}
-
-    for issue in board_issues:
-        fields = issue.get("fields", {})
-        status = (fields.get("status") or {})
-        is_completed = (status.get("statusCategory") or {}).get("key") == "done"
-
-        for sprint in _extract_issue_sprints(fields):
-            sprint_id = sprint.get("id")
-            sprint_state = str(sprint.get("state", "")).lower()
-            if not sprint_id or sprint_state not in {"closed", "active"}:
-                continue
-
-            key = str(sprint_id)
-            bucket = sprint_map.setdefault(
-                key,
-                {
-                    "id": sprint_id,
-                    "name": sprint.get("name", f"Sprint {sprint_id}"),
-                    "state": sprint_state,
-                    "committed": 0,
-                    "completed": 0,
-                    "sort_key": sprint.get("completeDate") or sprint.get("endDate") or sprint.get("startDate") or "",
-                },
-            )
-            bucket["committed"] += 1
-            if is_completed:
-                bucket["completed"] += 1
-
-    ordered = sorted(sprint_map.values(), key=lambda item: (str(item.get("sort_key", "")), str(item.get("name", ""))))[-6:]
-    logger.info(
-        "build_sprint_velocity: derived %s sprint bucket(s) from simple board id=%s for project %s",
-        len(ordered),
-        board_id,
-        project_key,
-    )
-    return [
-        {
-            "sprint": _format_sprint_label(str(item.get("name", "")), item.get("id")),
-            "committed": int(item.get("committed", 0) or 0),
-            "completed": int(item.get("completed", 0) or 0),
-            "state": str(item.get("state", "")),
-        }
-        for item in ordered
-    ]
-
-
-def build_sprint_velocity(project_key: str) -> list:
-    """
-    Return a list of recent sprints with committed vs completed issue counts.
-    Used to power the velocity chart in the Forecast widget.
-    Returns up to 6 closed/active sprints, oldest first.
-    """
-    try:
-        boards_data = jira_agile_get("board", params={"projectKeyOrId": project_key, "maxResults": 50})
-        boards = boards_data.get("values", [])
-        if not boards:
-            logger.info("build_sprint_velocity: no boards found for project %s", project_key)
-            return []
-
-        board = select_sprint_board(boards, project_key)
-        if not board:
-            logger.info("build_sprint_velocity: no sprint-capable board selected for project %s", project_key)
-            return []
-
-        board_type = (board.get("type") or "").lower()
-        if board_type == "simple":
-            logger.info(
-                "build_sprint_velocity: using issue-derived velocity for simple board id=%s name=%s project %s",
-                board.get("id"),
-                board.get("name", ""),
-                project_key,
-            )
-            return build_simple_board_velocity(board.get("id"), project_key)
-
-        if board_type and board_type != "scrum":
-            logger.info(
-                "build_sprint_velocity: selected board id=%s name=%s type=%s for project %s; sprint data unavailable",
-                board.get("id"),
-                board.get("name", ""),
-                board.get("type", ""),
-                project_key,
-            )
-            return []
-
-        board_id = board.get("id")
-        logger.info(
-            "build_sprint_velocity: selected board id=%s name=%s type=%s from %s board(s) for project %s",
-            board_id,
-            board.get("name", ""),
-            board.get("type", ""),
-            len(boards),
-            project_key,
-        )
-
-        sprints_data = jira_agile_get(f"board/{board_id}/sprint", params={"maxResults": 20})
-        sprints = sprints_data.get("values", [])
-
-        # Keep closed + active sprints only, take last 6
-        relevant = [s for s in sprints if s.get("state") in ("closed", "active")][-6:]
-        if not relevant:
-            logger.info(
-                "build_sprint_velocity: no closed/active sprints found on board id=%s for project %s",
-                board_id,
-                project_key,
-            )
-
-        velocity_data = []
-        for sprint in relevant:
-            sid = sprint.get("id")
-            name = sprint.get("name", f"Sprint {sid}")
-            state = sprint.get("state", "")
-
-            # Issues in sprint
-            try:
-                sprint_issues = jira_agile_get(f"sprint/{sid}/issue", params={
-                    "maxResults": 200,
-                    "fields": "status,story_points,customfield_10016"
-                })
-                all_issues = sprint_issues.get("issues", [])
-                committed = len(all_issues)
-                completed = sum(
-                    1 for i in all_issues
-                    if (i.get("fields", {}).get("status", {}) or {}).get("statusCategory", {}).get("key") == "done"
-                )
-                velocity_data.append({
-                    "sprint": name.split(" ")[-1] if len(name) > 12 else name,
-                    "committed": committed,
-                    "completed": completed,
-                    "state": state,
-                })
-            except Exception as sprint_error:
-                logger.warning(
-                    "build_sprint_velocity: sprint issue lookup failed for sprint id=%s on board id=%s: %s",
-                    sid,
-                    board_id,
-                    sprint_error,
-                )
-                velocity_data.append({
-                    "sprint": name.split(" ")[-1] if len(name) > 12 else name,
-                    "committed": 0,
-                    "completed": 0,
-                    "state": state,
-                })
-
-        return velocity_data
-    except Exception as e:
-        logger.warning(f"build_sprint_velocity failed: {e}")
-        return []
-
-
 def jira_post(path: str, payload: dict) -> dict:
     cfg  = get_jira_auth()
     if not cfg:
@@ -629,7 +313,7 @@ def clamp_score(value: float, lower: int = 0, upper: int = 100) -> int:
 
 def llm_synthesize_project_intelligence(base_intelligence: Dict[str, Any]) -> Dict[str, Any]:
     """Use LLM to generate decision-focused narrative and recommendations."""
-    model = llm_intelligence or llm_fast or llm
+    model = llm_fast or llm
     if not model:
         return {}
 
@@ -672,7 +356,6 @@ Rules:
     }
 
     try:
-        started_at = time.time()
         response = model.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=json.dumps(compact_input))
@@ -719,96 +402,9 @@ Rules:
         if clean_recs:
             out["recommendations"] = clean_recs
 
-        logger.info("LLM intelligence synthesis completed in %.2fs", time.time() - started_at)
         return out
     except Exception as e:
         logger.warning(f"LLM intelligence synthesis failed: {e}")
-        return {}
-
-
-def llm_summarize_portfolio_intelligence(portfolio_snapshot: Dict[str, Any]) -> Dict[str, Any]:
-    """Use LLM to summarize portfolio-wide delivery health across projects."""
-    model = llm_intelligence or llm_fast or llm
-    if not model:
-        return {}
-
-    system_prompt = """You are a portfolio delivery advisor for software programs.
-Given cross-project delivery metrics, return ONLY strict JSON with this schema:
-{
-  "executive_summary": "string",
-  "portfolio_risk": "Low|Medium|High",
-  "overall_label": "Good|Watch|Risk",
-  "recommendations": [
-    {"title": "string", "reason": "string", "impact": "string"}
-  ]
-}
-
-Rules:
-- recommendations should contain 4 to 6 concise, action-oriented items when possible.
-- Focus on portfolio-level coordination and risk balancing, not single-issue details.
-- Return JSON only, no markdown.
-"""
-
-    compact_input = {
-        "project_count": portfolio_snapshot.get("project_count", 0),
-        "evaluated_project_count": portfolio_snapshot.get("evaluated_project_count", 0),
-        "average_health_score": portfolio_snapshot.get("average_health_score", 0),
-        "risk_breakdown": portfolio_snapshot.get("risk_breakdown", {}),
-        "totals": {
-            "open_issues": portfolio_snapshot.get("totals", {}).get("open_issues", 0),
-            "blocked_issues": portfolio_snapshot.get("totals", {}).get("blocked_issues", 0),
-        },
-        "top_risky_projects": portfolio_snapshot.get("top_risky_projects", [])[:5],
-    }
-
-    try:
-        started_at = time.time()
-        response = model.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=json.dumps(compact_input))
-        ])
-        raw = (response.content or "").strip()
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not match:
-            return {}
-        parsed = json.loads(match.group())
-
-        out: Dict[str, Any] = {}
-
-        executive_summary = str(parsed.get("executive_summary", "")).strip()
-        if executive_summary:
-            out["executive_summary"] = executive_summary[:650]
-
-        portfolio_risk = str(parsed.get("portfolio_risk", "")).strip().title()
-        if portfolio_risk in {"Low", "Medium", "High"}:
-            out["portfolio_risk"] = portfolio_risk
-
-        overall_label = str(parsed.get("overall_label", "")).strip().title()
-        if overall_label in {"Good", "Watch", "Risk"}:
-            out["overall_label"] = overall_label
-
-        recommendations = parsed.get("recommendations", [])
-        clean_recs = []
-        if isinstance(recommendations, list):
-            for item in recommendations[:6]:
-                if not isinstance(item, dict):
-                    continue
-                title = str(item.get("title", "")).strip()
-                reason = str(item.get("reason", "")).strip()
-                impact = str(item.get("impact", "")).strip()
-                if title and reason and impact:
-                    clean_recs.append({
-                        "title": title[:120],
-                        "reason": reason[:280],
-                        "impact": impact[:220],
-                    })
-        if clean_recs:
-            out["recommendations"] = clean_recs
-
-        logger.info("LLM portfolio synthesis completed in %.2fs", time.time() - started_at)
-        return out
-    except Exception as e:
-        logger.warning(f"LLM portfolio synthesis failed: {e}")
         return {}
 
 
@@ -818,7 +414,7 @@ def llm_generate_assignment_suggestions(
     assignee_loads: List[Dict[str, Any]],
 ) -> List[Dict[str, str]]:
     """Generate assignee recommendations for unassigned issues using LLM."""
-    model = llm_assignment_fast or llm_fast or llm
+    model = llm_fast or llm
     if not model or not unassigned_issues or not assignee_loads:
         return []
 
@@ -862,7 +458,6 @@ Rules:
 """
 
     try:
-        started_at = time.time()
         response = model.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=json.dumps(compact_input))
@@ -899,30 +494,18 @@ Rules:
                 "reason": reason[:140],
             })
 
-        logger.info("LLM assignment suggestions completed in %.2fs", time.time() - started_at)
         return clean
     except Exception as e:
         logger.warning(f"LLM assignment suggestion failed: {e}")
         return []
 
 
-def build_project_intelligence(
-    project_key: str,
-    include_velocity: bool = False,
-    include_llm: bool = True,
-    include_assignment: bool = True,
-) -> Dict[str, Any]:
+def build_project_intelligence(project_key: str) -> Dict[str, Any]:
     """Compute project health, forecast, and recommended actions from Jira issues."""
     if not project_key:
         raise ValueError("Project key is required")
     if not get_jira_auth():
         raise ValueError("Jira not connected")
-
-    intelligence_started_at = time.time()
-    summary_time_budget = env_float("INTELLIGENCE_SUMMARY_MAX_SECONDS", 20.0, min_value=5.0)
-    full_time_budget = env_float("INTELLIGENCE_FULL_MAX_SECONDS", 55.0, min_value=10.0)
-    intelligence_time_budget = full_time_budget if include_llm else summary_time_budget
-    assignment_min_budget = env_float("INTELLIGENCE_ASSIGNMENT_MIN_SECONDS", 10.0, min_value=3.0)
 
     open_issues_data = jira_get_cached("search/jql", params={
         "jql": f"project={project_key} ORDER BY updated DESC",
@@ -1110,40 +693,28 @@ def build_project_intelligence(
         "assignment_suggestions_source": "rules",
         "executive_summary": " ".join(highlights[:2]),
         "analysis_source": "rules",
-        "sprint_velocity": build_sprint_velocity(project_key) if include_velocity else [],
     }
 
-    if include_llm:
-        llm_intel = llm_synthesize_project_intelligence(intelligence)
-        if llm_intel:
-            if "health_score" in llm_intel:
-                intelligence["health_score"] = llm_intel["health_score"]
-            if "health_label" in llm_intel:
-                intelligence["health_label"] = llm_intel["health_label"]
-            if "risk_level" in llm_intel:
-                intelligence["risk_level"] = llm_intel["risk_level"]
-            if "executive_summary" in llm_intel:
-                intelligence["executive_summary"] = llm_intel["executive_summary"]
-            if "forecast" in llm_intel and isinstance(llm_intel["forecast"], dict):
-                intelligence["forecast"].update(llm_intel["forecast"])
-            if "recommendations" in llm_intel:
-                intelligence["recommendations"] = llm_intel["recommendations"]
-            intelligence["analysis_source"] = "llm"
+    llm_intel = llm_synthesize_project_intelligence(intelligence)
+    if llm_intel:
+        if "health_score" in llm_intel:
+            intelligence["health_score"] = llm_intel["health_score"]
+        if "health_label" in llm_intel:
+            intelligence["health_label"] = llm_intel["health_label"]
+        if "risk_level" in llm_intel:
+            intelligence["risk_level"] = llm_intel["risk_level"]
+        if "executive_summary" in llm_intel:
+            intelligence["executive_summary"] = llm_intel["executive_summary"]
+        if "forecast" in llm_intel and isinstance(llm_intel["forecast"], dict):
+            intelligence["forecast"].update(llm_intel["forecast"])
+        if "recommendations" in llm_intel:
+            intelligence["recommendations"] = llm_intel["recommendations"]
+        intelligence["analysis_source"] = "llm"
 
-    elapsed_after_intel = time.time() - intelligence_started_at
-    remaining_budget = intelligence_time_budget - elapsed_after_intel
-    if include_assignment and remaining_budget >= assignment_min_budget:
-        llm_assignment = llm_generate_assignment_suggestions(project_key, unassigned_issues, active_assignees)
-        if llm_assignment:
-            intelligence["assignment_suggestions"] = llm_assignment
-            intelligence["assignment_suggestions_source"] = "llm"
-    elif include_assignment:
-        logger.info(
-            "Skipping LLM assignment suggestions for %s due to time budget: elapsed=%.2fs budget=%.2fs",
-            project_key,
-            elapsed_after_intel,
-            intelligence_time_budget,
-        )
+    llm_assignment = llm_generate_assignment_suggestions(project_key, unassigned_issues, active_assignees)
+    if llm_assignment:
+        intelligence["assignment_suggestions"] = llm_assignment
+        intelligence["assignment_suggestions_source"] = "llm"
 
     return intelligence
 
@@ -1215,7 +786,7 @@ def ensure_selected_project() -> bool:
 # LLM setup
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_llm(fast: bool = False, request_timeout: int = 30, max_retries: int = 1) -> Optional[ChatOpenAI]:
+def get_llm(fast: bool = False) -> Optional[ChatOpenAI]:
     api_key  = os.getenv("QWEN_API_KEY", "")
     base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
     model    = os.getenv("QWEN_MODEL_FAST" if fast else "QWEN_MODEL", "qwen-plus")
@@ -1226,90 +797,15 @@ def get_llm(fast: bool = False, request_timeout: int = 30, max_retries: int = 1)
         return ChatOpenAI(
             model=model, temperature=0.1,
             api_key=api_key, base_url=base_url,
-            request_timeout=request_timeout, max_retries=max_retries,
+            request_timeout=30, max_retries=1,
         )
     except Exception as e:
         logger.error(f"LLM init failed: {e}")
         return None
 
 
-def llm_detect_anomalies(issues: List[Dict], project_key: str) -> Dict[str, Any]:
-    """LLM scans issue data for anomalies a rule engine would miss."""
-    model = llm_fast or llm
-    if not model or not issues:
-        return {}
-
-    # Compact representation to stay within context
-    compact = [
-        {
-            "key": i.get("key"),
-            "summary": i.get("summary", "")[:80],
-            "status": i.get("status"),
-            "assignee": i.get("assignee"),
-            "priority": i.get("priority"),
-            "updated": i.get("updated"),
-        }
-        for i in issues[:60]
-    ]
-
-    system = """You are a delivery risk analyst. Find NON-OBVIOUS anomalies in this Jira backlog.
-Do NOT flag things the rules engine already catches (blockers, overdue, unassigned).
-Look for: duplicate effort, scope creep signals, inconsistent priorities, 
-problematic naming patterns, suspiciously similar summaries, 
-issues that should be linked but aren't, priority mismatches with status.
-
-Return ONLY JSON:
-{
-  "anomalies": [
-    {"type": "string", "issues": ["KEY-1"], "observation": "string", "suggested_action": "string"}
-  ]
-}
-JSON only, no markdown."""
-
-    try:
-        response = model.invoke([
-            SystemMessage(content=system),
-            HumanMessage(content=json.dumps({"project": project_key, "issues": compact}))
-        ])
-        raw = (response.content or "").strip()
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-    except Exception as e:
-        logger.warning(f"Anomaly detection failed: {e}")
-    return {}
-
-
-LLM_TIMEOUT_DEFAULT_SECONDS = env_float("LLM_TIMEOUT_DEFAULT_SECONDS", 30.0, min_value=1.0)
-LLM_TIMEOUT_FAST_SECONDS = env_float("LLM_TIMEOUT_FAST_SECONDS", 18.0, min_value=1.0)
-LLM_TIMEOUT_INTELLIGENCE_SECONDS = env_float("LLM_TIMEOUT_INTELLIGENCE_SECONDS", 8.0, min_value=1.0)
-LLM_TIMEOUT_ASSIGNMENT_SECONDS = env_float("LLM_TIMEOUT_ASSIGNMENT_SECONDS", 6.0, min_value=1.0)
-
-LLM_RETRIES_DEFAULT = env_int("LLM_RETRIES_DEFAULT", 1, min_value=0)
-LLM_RETRIES_FAST = env_int("LLM_RETRIES_FAST", 1, min_value=0)
-LLM_RETRIES_INTELLIGENCE = env_int("LLM_RETRIES_INTELLIGENCE", 0, min_value=0)
-LLM_RETRIES_ASSIGNMENT = env_int("LLM_RETRIES_ASSIGNMENT", 0, min_value=0)
-
-llm = get_llm(
-    fast=False,
-    request_timeout=LLM_TIMEOUT_DEFAULT_SECONDS,
-    max_retries=LLM_RETRIES_DEFAULT,
-)
-llm_fast = get_llm(
-    fast=True,
-    request_timeout=LLM_TIMEOUT_FAST_SECONDS,
-    max_retries=LLM_RETRIES_FAST,
-)
-llm_intelligence = get_llm(
-    fast=True,
-    request_timeout=LLM_TIMEOUT_INTELLIGENCE_SECONDS,
-    max_retries=LLM_RETRIES_INTELLIGENCE,
-)
-llm_assignment_fast = get_llm(
-    fast=True,
-    request_timeout=LLM_TIMEOUT_ASSIGNMENT_SECONDS,
-    max_retries=LLM_RETRIES_ASSIGNMENT,
-)
+llm      = get_llm(fast=False)
+llm_fast = get_llm(fast=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1617,9 +1113,6 @@ def run_jira_agent(prompt: str, project_key: str) -> Dict:
         for t in tool_specs
     ])
 
-    prompt_lower = (prompt or "").lower()
-    assignment_intent = any(k in prompt_lower for k in ["assign", "reassign", "owner", "assignee"])
-
     system_prompt = f"""You are a Jira assistant. Current project key: {project_key}
 
 Available tools:
@@ -1632,24 +1125,8 @@ To give final answer:
 {{"result": {{...}}, "summary": "explanation"}}
 
 Always use project key: {project_key}
-
-Important mutation rule:
-- If the user asks to assign or reassign an issue, you MUST call jira_update_issue before returning final result.
-- jira_update_issue supports assignee_name (display name) and resolves accountId automatically.
 """
-    # Build message history from conversation
-    messages = [SystemMessage(content=system_prompt)]
-    
-    # Add previous conversation turns (exclude current prompt, already being added)
-    history = get_conversation_history()
-    for turn in history[:-1]:  # Skip the last turn (current user prompt)
-        if turn["role"] == "user":
-            messages.append(HumanMessage(content=turn["content"]))
-        elif turn["role"] == "assistant":
-            messages.append(AIMessage(content=turn["content"]))
-    
-    # Add current prompt
-    messages.append(HumanMessage(content=prompt))
+    messages = [SystemMessage(content=system_prompt), HumanMessage(content=prompt)]
     tool_results = []
 
     def _extract_first_json_object(text: str) -> Optional[str]:
@@ -1735,30 +1212,10 @@ Important mutation rule:
                 tool_args["auth_context"] = auth_context
                 if tool_name in {"jira_get_sprints", "jira_get_project_summary", "jira_get_my_issues", "jira_create_issue"}:
                     tool_args.setdefault("project_key", project_key)
-
-                if assignment_intent and tool_name == "jira_update_issue":
-                    has_assignment_arg = any(
-                        str(tool_args.get(k, "")).strip()
-                        for k in ["assignee_account_id", "assignee_name", "assignee"]
-                    )
-                    if not has_assignment_arg:
-                        messages.append(response)
-                        messages.append(HumanMessage(
-                            content=(
-                                "Assignment requested, but jira_update_issue was called without assignee fields. "
-                                "Call jira_update_issue with assignee_name (or assignee_account_id)."
-                            )
-                        ))
-                        continue
-
                 logger.info(f"MCP tool call: {tool_name}({tool_args})")
                 try:
                     tool_result = call_jira_tool(tool_name, tool_args)
                     tool_results.append({"tool": tool_name, "result": tool_result})
-
-                    if tool_name in {"jira_update_issue", "jira_create_issue"}:
-                        clear_user_cache()
-
                     messages.append(response)
                     messages.append(HumanMessage(
                         content=f"Tool {tool_name} returned: {json.dumps(tool_result)}\n\nNow give the final result as JSON."
@@ -1799,34 +1256,6 @@ Important mutation rule:
                     return {"raw_response": f"Tool {tool_name} failed: {e}"}
 
             elif "result" in parsed:
-                if assignment_intent and "jira_update_issue" not in [t["tool"] for t in tool_results]:
-                    messages.append(response)
-                    messages.append(HumanMessage(
-                        content=(
-                            "Assignment requested, but you did not call jira_update_issue. "
-                            "Call jira_update_issue first, then return final JSON result."
-                        )
-                    ))
-                    continue
-
-                if assignment_intent:
-                    update_results = [t.get("result", {}) for t in tool_results if t.get("tool") == "jira_update_issue"]
-                    valid_assignment = any(
-                        isinstance(r, dict)
-                        and not r.get("error")
-                        and str(r.get("assignee_account_id") or "").strip()
-                        for r in update_results
-                    )
-                    if not valid_assignment:
-                        messages.append(response)
-                        messages.append(HumanMessage(
-                            content=(
-                                "Assignment confirmation missing. Call jira_update_issue with assignee_name and "
-                                "return final JSON only after tool confirms assignee_account_id."
-                            )
-                        ))
-                        continue
-
                 result = parsed["result"]
                 result["raw_response"] = parsed.get("summary", raw_text)
                 result["tool_calls"]   = [t["tool"] for t in tool_results]
@@ -2033,113 +1462,12 @@ def generate_chart_b64(chart_type: str, title: str, labels: list, values: list) 
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def build_plotly_chart_spec(chart_type: str, title: str, labels: list, values: list) -> Optional[Dict[str, Any]]:
-    labels = labels or ["No Data"]
-    raw_values = values or [0]
-    numeric_values = []
-    for value in raw_values:
-        try:
-            numeric_values.append(float(value))
-        except Exception:
-            numeric_values.append(0.0)
-
-    palette = ["#0f9d8a", "#2f80ed", "#ff6b4a", "#f0b429", "#5b6cff", "#2eaf74"]
-
-    if chart_type == "gantt":
-        rows = []
-        if isinstance(values, list) and values and isinstance(values[0], dict):
-            for row in values[:20]:
-                if not isinstance(row, dict):
-                    continue
-                start = row.get("start") or row.get("created")
-                end = row.get("end") or row.get("due")
-                if not start and not end:
-                    continue
-                rows.append({
-                    "Task": str(row.get("label") or row.get("key") or "Issue"),
-                    "Start": start,
-                    "Finish": end or start,
-                    "Status": str(row.get("status") or "Planned"),
-                })
-
-        if not rows:
-            return None
-
-        try:
-            import plotly.express as px
-
-            fig = px.timeline(
-                rows,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Status",
-                title=title,
-                color_discrete_sequence=palette,
-            )
-            fig.update_yaxes(autorange="reversed")
-        except Exception as exc:
-            logger.warning(f"Plotly gantt spec generation failed: {exc}")
-            return None
-    elif chart_type == "pie":
-        total = sum(numeric_values)
-        fig = go.Figure(data=[go.Pie(
-            labels=labels if total > 0 else ["No Data"],
-            values=numeric_values if total > 0 else [1],
-            hole=0.5,
-            marker={"colors": palette[:max(len(labels), 1)]},
-            textinfo="label+percent" if total > 0 else "label",
-        )])
-        fig.update_layout(title=title)
-    elif chart_type == "line":
-        fig = go.Figure(data=[go.Scatter(
-            x=labels,
-            y=numeric_values,
-            mode="lines+markers",
-            line={"color": palette[1], "width": 3},
-            marker={"size": 8},
-            fill="tozeroy",
-            fillcolor="rgba(47,128,237,0.14)",
-        )])
-        fig.update_layout(title=title, xaxis_title="Categories", yaxis_title="Values")
-    elif chart_type == "metrics":
-        return None
-    else:
-        fig = go.Figure(data=[go.Bar(
-            x=labels,
-            y=numeric_values,
-            marker={"color": palette[:max(len(labels), 1)]},
-            text=[str(value) for value in raw_values],
-            textposition="outside",
-        )])
-        fig.update_layout(title=title, xaxis_title="Categories", yaxis_title="Values")
-
-    fig.update_layout(
-        paper_bgcolor="#f8fafc",
-        plot_bgcolor="#ffffff",
-        margin={"l": 40, "r": 20, "t": 60, "b": 50},
-        font={"family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", "color": "#24344d"},
-        showlegend=(chart_type == "pie" or chart_type == "gantt"),
-    )
-    fig.update_xaxes(showgrid=False, tickangle=-28, linecolor="#d9e2ef")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(217,226,239,0.55)", zeroline=False, linecolor="#d9e2ef")
-
-    return {
-        "data": fig.to_plotly_json().get("data", []),
-        "layout": fig.to_plotly_json().get("layout", {}),
-        "config": {
-            "displayModeBar": False,
-            "responsive": True,
-        },
-    }
-
-
 def detect_chart_type(prompt: str) -> str:
     p = prompt.lower()
     if any(w in p for w in ["gantt", "timeline", "roadmap"]): return "gantt"
+    if "pie"   in p: return "pie"
     if "line"  in p: return "line"
     if any(w in p for w in ["metric", "kpi"]): return "metrics"
-    if any(w in p for w in ["pie", "donut", "doughnut", "distribution", "breakdown"]): return "pie"
     return "bar"
 
 
@@ -2209,72 +1537,16 @@ def build_gantt_chart_data(prompt: str, project_key: str) -> Optional[Dict[str, 
 
 
 def extract_chart_data(agent_result: dict, prompt: str, project_key: str) -> Optional[Dict]:
-    def map_status(status_name: str) -> str:
-        s = (status_name or "").strip().lower()
-        if s in {"to do"}:
-            return "To Do"
-        if s in {"in progress", "in review", "review", "testing"}:
-            return "In Progress"
-        if s in {"done", "closed", "resolved", "complete", "completed"}:
-            return "Done"
-        if s in {"blocked", "impediment"}:
-            return "Blocked"
-        if s in {"quality assurance", "qa"}:
-            return "Quality Assurance"
-        return "Other"
-
-    def aggregate_from_issue_rows(issue_rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        if not issue_rows:
-            return None
-
-        p = prompt.lower()
-        counts: Dict[str, int] = {}
-        title = f"{project_key} — Issue Status"
-
-        if "assignee" in p or "who" in p:
-            for issue in issue_rows:
-                bucket = str(issue.get("assignee") or "Unassigned").strip() or "Unassigned"
-                counts[bucket] = counts.get(bucket, 0) + 1
-            title = f"{project_key} — Issues by Assignee"
-        elif "priority" in p:
-            for issue in issue_rows:
-                bucket = str(issue.get("priority") or "None").strip() or "None"
-                counts[bucket] = counts.get(bucket, 0) + 1
-            title = f"{project_key} — Issues by Priority"
-        elif "type" in p or "kind" in p:
-            for issue in issue_rows:
-                bucket = str(issue.get("type") or issue.get("issuetype") or "Unknown").strip() or "Unknown"
-                counts[bucket] = counts.get(bucket, 0) + 1
-            title = f"{project_key} — Issues by Type"
-        else:
-            for issue in issue_rows:
-                bucket = map_status(str(issue.get("status") or "Unknown"))
-                counts[bucket] = counts.get(bucket, 0) + 1
-            title = f"{project_key} — Issue Status"
-
-        counts = {k: v for k, v in counts.items() if v > 0}
-        if not counts:
-            return None
-
-        sorted_counts = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-        return {
-            "title": title,
-            "labels": [k for k, _ in sorted_counts],
-            "values": [v for _, v in sorted_counts],
-        }
-
     if "chart_data" in agent_result:
         cd = agent_result["chart_data"]
         return {"title": cd.get("title", "Chart"), "labels": cd.get("labels", []), "values": cd.get("values", [])}
 
-    title_by_key = {
-        "status_counts": f"{project_key} — Issue Status",
-        "assignee_counts": f"{project_key} — Issues by Assignee",
-        "priority_counts": f"{project_key} — Issues by Priority",
-        "type_counts": f"{project_key} — Issues by Type",
-    }
-
-    for key in ["status_counts", "assignee_counts", "priority_counts", "type_counts"]:
+    for key, title_template in [
+        ("status_counts",   f"{project_key} — Issue Status"),
+        ("assignee_counts", f"{project_key} — Issues by Assignee"),
+        ("priority_counts", f"{project_key} — Issues by Priority"),
+        ("type_counts",     f"{project_key} — Issues by Type"),
+    ]:
         if key in agent_result and agent_result[key]:
             p = prompt.lower()
             selected_key = key
@@ -2283,19 +1555,7 @@ def extract_chart_data(agent_result: dict, prompt: str, project_key: str) -> Opt
             elif "type" in p or "kind" in p:       selected_key = "type_counts"
             else:                                  selected_key = "status_counts"
             counts = agent_result.get(selected_key, agent_result[key])
-            return {
-                "title": title_by_key.get(selected_key, title_by_key.get(key, "Chart")),
-                "labels": list(counts.keys()),
-                "values": list(counts.values()),
-            }
-
-    issue_rows = agent_result.get("issues") if isinstance(agent_result.get("issues"), list) else []
-    if not issue_rows and isinstance(agent_result.get("jira_results"), list):
-        issue_rows = [r for r in agent_result.get("jira_results", []) if isinstance(r, dict)]
-
-    if issue_rows:
-        return aggregate_from_issue_rows(issue_rows)
-
+            return {"title": title_template, "labels": list(counts.keys()), "values": list(counts.values())}
     return None
 
 
@@ -2337,7 +1597,7 @@ def ensure_jira_chart_data_for_export(prompt: str, project_key: str, agent_resul
     except Exception as e:
         logger.warning(f"[EXPORT] Failed to fetch project summary: {e}")
     
-    # Alternative: search for issues and aggregate by the requested chart dimension.
+    # Alternative: search for issues and aggregate by status
     try:
         if get_jira_auth():
             data = jira_get_cached("search/jql", params={
@@ -2363,52 +1623,23 @@ def ensure_jira_chart_data_for_export(prompt: str, project_key: str, agent_resul
                 else:
                     return "Other"
 
-            p = (prompt or "").lower()
-            counts: Dict[str, int] = {}
+            status_counts = {"To Do": 0, "In Progress": 0, "Done": 0, "Blocked": 0, "Quality Assurance": 0, "Other": 0}
+            for issue in data.get("issues", []):
+                raw_status = issue.get("fields", {}).get("status", {}).get("name", "Unknown")
+                mapped_status = map_status(raw_status)
+                status_counts[mapped_status] += 1
 
-            if "assignee" in p or "who" in p:
-                for issue in data.get("issues", []):
-                    fields = issue.get("fields", {})
-                    assignee = fields.get("assignee") or {}
-                    bucket = assignee.get("displayName", "Unassigned") if assignee else "Unassigned"
-                    counts[bucket] = counts.get(bucket, 0) + 1
-                title = f"{project_key} — Issues by Assignee"
-                logger.info(f"[EXPORT] Using aggregated assignee data: {counts}")
-            elif "priority" in p:
-                for issue in data.get("issues", []):
-                    fields = issue.get("fields", {})
-                    priority = fields.get("priority") or {}
-                    bucket = priority.get("name", "None") if priority else "None"
-                    counts[bucket] = counts.get(bucket, 0) + 1
-                title = f"{project_key} — Issues by Priority"
-                logger.info(f"[EXPORT] Using aggregated priority data: {counts}")
-            elif "type" in p or "kind" in p:
-                for issue in data.get("issues", []):
-                    fields = issue.get("fields", {})
-                    issue_type = fields.get("issuetype") or {}
-                    bucket = issue_type.get("name", "Unknown") if issue_type else "Unknown"
-                    counts[bucket] = counts.get(bucket, 0) + 1
-                title = f"{project_key} — Issues by Type"
-                logger.info(f"[EXPORT] Using aggregated type data: {counts}")
-            else:
-                status_counts = {"To Do": 0, "In Progress": 0, "Done": 0, "Blocked": 0, "Quality Assurance": 0, "Other": 0}
-                for issue in data.get("issues", []):
-                    raw_status = issue.get("fields", {}).get("status", {}).get("name", "Unknown")
-                    mapped_status = map_status(raw_status)
-                    status_counts[mapped_status] += 1
-                counts = {k: v for k, v in status_counts.items() if v > 0}
-                title = f"{project_key} — Issue Status"
-                logger.info(f"[EXPORT] Using aggregated status data: {counts}")
-
-            if counts:
-                sorted_counts = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+            # Remove zero-count categories except 'Other' if it's zero
+            filtered_counts = {k: v for k, v in status_counts.items() if v > 0 and (k != "Other" or v > 0)}
+            if filtered_counts:
+                logger.info(f"[EXPORT] Using aggregated status data: {filtered_counts}")
                 return {
-                    "title": title,
-                    "labels": [k for k, _ in sorted_counts],
-                    "values": [v for _, v in sorted_counts],
+                    "title": f"{project_key} — Issue Status",
+                    "labels": list(filtered_counts.keys()),
+                    "values": list(filtered_counts.values())
                 }
     except Exception as e:
-        logger.warning(f"[EXPORT] Failed to aggregate issues for export: {e}")
+        logger.warning(f"[EXPORT] Failed to aggregate issues by status: {e}")
     
     logger.warning(f"[EXPORT] No real Jira data found for {project_key}")
     return None
@@ -2432,50 +1663,23 @@ def create_excel_with_chart(chart_data: dict, chart_config: dict, project_key: s
     ws_summary = wb.active
     ws_summary.title = "Summary"
     
+    # Add summary headers
+    ws_summary['A1'] = "Category"
+    ws_summary['B1'] = "Count"
+    ws_summary['A1'].font = Font(bold=True, size=12)
+    ws_summary['B1'].font = Font(bold=True, size=12)
+    ws_summary['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_summary['B1'].alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Add summary data rows
     labels = chart_data.get("labels", [])
     values = chart_data.get("values", [])
-    chart_type = chart_config.get("chart_type", "")
-    is_gantt = chart_type == "gantt" or (values and isinstance(values[0], dict))
-
-    if is_gantt:
-        # Gantt summary: one row per issue with timeline columns
-        ws_summary['A1'] = "Issue Key"
-        ws_summary['B1'] = "Start"
-        ws_summary['C1'] = "End"
-        ws_summary['D1'] = "Duration (days)"
-        ws_summary['E1'] = "Status"
-        ws_summary['F1'] = "Summary"
-        for col in ['A', 'B', 'C', 'D', 'E', 'F']:
-            ws_summary[f'{col}1'].font = Font(bold=True, size=12)
-            ws_summary[f'{col}1'].alignment = Alignment(horizontal="center", vertical="center")
-        for idx, row in enumerate(values, start=2):
-            if not isinstance(row, dict):
-                continue
-            ws_summary[f'A{idx}'] = str(row.get("label") or row.get("key") or labels[idx - 2] if idx - 2 < len(labels) else "")
-            ws_summary[f'B{idx}'] = str(row.get("start") or "")[:10]
-            ws_summary[f'C{idx}'] = str(row.get("end") or "")[:10]
-            ws_summary[f'D{idx}'] = row.get("duration") or ""
-            ws_summary[f'E{idx}'] = str(row.get("status") or "")
-            ws_summary[f'F{idx}'] = str(row.get("summary") or "")
-        ws_summary.column_dimensions['A'].width = 12
-        ws_summary.column_dimensions['B'].width = 14
-        ws_summary.column_dimensions['C'].width = 14
-        ws_summary.column_dimensions['D'].width = 16
-        ws_summary.column_dimensions['E'].width = 16
-        ws_summary.column_dimensions['F'].width = 40
-    else:
-        # Standard chart summary: category / count
-        ws_summary['A1'] = "Category"
-        ws_summary['B1'] = "Count"
-        ws_summary['A1'].font = Font(bold=True, size=12)
-        ws_summary['B1'].font = Font(bold=True, size=12)
-        ws_summary['A1'].alignment = Alignment(horizontal="center", vertical="center")
-        ws_summary['B1'].alignment = Alignment(horizontal="center", vertical="center")
-        for idx, (label, value) in enumerate(zip(labels, values), start=2):
-            ws_summary[f'A{idx}'] = label
-            ws_summary[f'B{idx}'] = value
-        ws_summary.column_dimensions['A'].width = 25
-        ws_summary.column_dimensions['B'].width = 15
+    for idx, (label, value) in enumerate(zip(labels, values), start=2):
+        ws_summary[f'A{idx}'] = label
+        ws_summary[f'B{idx}'] = value
+    
+    ws_summary.column_dimensions['A'].width = 25
+    ws_summary.column_dimensions['B'].width = 15
     
     # Add detailed Jira issues sheet
     ws_issues = wb.create_sheet("Jira Issues")
@@ -2625,7 +1829,7 @@ def build_multi_chart_dashboard(project_key: str) -> Dict[str, Any]:
             "title": spec["title"],
             "labels": labels,
             "values": values,
-            "plot_spec": build_plotly_chart_spec(spec["chart_type"], spec["title"], labels, values),
+            "image_base64": generate_chart_b64(spec["chart_type"], spec["title"], labels, values),
             "data_source": "jira_mcp",
             "created_at": datetime.now().isoformat(),
         })
@@ -2710,7 +1914,7 @@ def process_prompt(prompt: str) -> Dict:
             _user_dashboards[uid] = {}
         return {"response": "All dashboards cleared! ✓", "cleared": True}
 
-    chart_keywords  = ["chart", "graph", "pie", "bar", "line", "visuali", "plot", "metrics", "kpi", "burndown", "burn down", "gantt", "timeline", "roadmap", "distribution", "breakdown", "donut", "doughnut"]
+    chart_keywords  = ["chart", "graph", "pie", "bar", "line", "visuali", "plot", "metrics", "kpi", "burndown", "burn down", "gantt", "timeline", "roadmap"]
     create_keywords = ["create task", "create a task", "new task", "add task",
                        "create ticket", "open a ticket", "raise a ticket"]
     export_keywords = ["export", "excel", "download", "xlsx", "csv"]
@@ -2760,7 +1964,6 @@ def process_prompt(prompt: str) -> Dict:
     if wants_chart:
         if wants_multi_chart_dashboard:
             try:
-                logger.info(f"[PROCESS_PROMPT] Second check for multi-chart dashboard (after agent)")
                 dashboard_config = build_multi_chart_dashboard(project_key)
                 return {
                     "response": "Multi-chart dashboard generated.",
@@ -2802,11 +2005,6 @@ def process_prompt(prompt: str) -> Dict:
             except Exception as e:
                 logger.warning(f"Project summary fallback failed: {e}")
 
-        if not chart_data and jira_ok:
-            chart_data = ensure_jira_chart_data_for_export(prompt, project_key, agent_result)
-            if chart_data:
-                chart_data_source = "jira_mcp"
-
         if not chart_data and llm:
             try:
                 system = SystemMessage(content='Generate chart data as JSON only:\n{"title":"...","labels":[...],"values":[...]}')
@@ -2819,19 +2017,10 @@ def process_prompt(prompt: str) -> Dict:
                 pass
 
         if not chart_data:
-            if jira_ok:
-                logger.warning(f"[CHART] Jira connected but no usable chart buckets; returning no-data chart")
-                chart_data = {
-                    "title": f"{project_key} — No Jira Data",
-                    "labels": ["No Data"],
-                    "values": [0],
-                }
-                chart_data_source = "jira_empty"
-            else:
-                logger.warning(f"[CHART] Using dummy data - no real Jira data available")
-                chart_data = {"title": "Sample Distribution",
-                              "labels": ["A", "B", "C", "D"], "values": [35, 25, 25, 15]}
-                chart_data_source = "sample_fallback"
+            logger.warning(f"[CHART] Using dummy data - no real Jira data available")
+            chart_data = {"title": "Sample Distribution",
+                          "labels": ["A", "B", "C", "D"], "values": [35, 25, 25, 15]}
+            chart_data_source = "sample_fallback"
 
         chart_id = str(uuid.uuid4())[:8]
 
@@ -2841,6 +2030,12 @@ def process_prompt(prompt: str) -> Dict:
             effective_type = "metrics"
             logger.info(f"Auto-switched chart type to metrics (only 1 data point)")
 
+        image_b64 = generate_chart_b64(
+            effective_type,
+            chart_data["title"],
+            chart_data["labels"],
+            chart_data["values"],
+        )
         chart_type = effective_type
         chart_config = {
             "chart_id":     chart_id,
@@ -2848,31 +2043,15 @@ def process_prompt(prompt: str) -> Dict:
             "title":        chart_data["title"],
             "labels":       chart_data["labels"],
             "values":       chart_data["values"],
-            "plot_spec":    build_plotly_chart_spec(chart_type, chart_data["title"], chart_data["labels"], chart_data["values"]),
+            "image_base64": image_b64,
             "created_at":   datetime.now().isoformat(),
             "data_source":  chart_data_source,
         }
-
-        # Gantt charts: always generate a matplotlib fallback image so the page can
-        # render even when the Plotly timeline spec fails or returns None.
-        if chart_type == 'gantt' and not chart_config.get("image_base64"):
-            try:
-                chart_config["image_base64"] = generate_chart_b64(
-                    chart_type, chart_data["title"], chart_data["labels"], chart_data["values"]
-                )
-            except Exception as _gantt_img_err:
-                logger.warning("Gantt fallback image generation failed: %s", _gantt_img_err)
 
         result = {"response": f"{chart_type.upper()} chart generated.", "chart_config": chart_config}
 
         if wants_export:
             logger.info(f"[EXPORT] Creating Excel with chart data: {len(chart_data.get('labels', []))} items")
-            chart_config["image_base64"] = generate_chart_b64(
-                chart_type,
-                chart_data["title"],
-                chart_data["labels"],
-                chart_data["values"],
-            )
             excel_buf = create_excel_with_chart(chart_data, chart_config, project_key)
             chart_config["export_format"] = "excel"
             chart_config["export_data"]   = base64.b64encode(excel_buf.getvalue()).decode()
@@ -3214,15 +2393,7 @@ def generate_dashboard():
     if not prompt:
         return jsonify({"error": "Prompt is required"}), 400
 
-    # Append user prompt to conversation history
-    append_conversation("user", prompt)
-    
     result = process_prompt(prompt)
-    
-    # Append assistant response to conversation history
-    response_text = result.get("response") or result.get("raw_response", "")
-    if response_text:
-        append_conversation("assistant", response_text)
 
     if result.get("error") and not result.get("needs_project"):
         return jsonify(result), 400
@@ -3232,7 +2403,6 @@ def generate_dashboard():
         save_user_dashboard(dash_id, {
             "id": dash_id,
             "prompt": prompt,
-            "prompt_history": [{"prompt": prompt, "timestamp": datetime.now().isoformat()}],
             "dashboard_config": result["dashboard_config"],
             "created_at": datetime.now().isoformat(),
         })
@@ -3243,12 +2413,12 @@ def generate_dashboard():
         save_user_dashboard(dash_id, {
             "id":           dash_id,
             "prompt":       prompt,
-            "prompt_history": [{"prompt": prompt, "timestamp": datetime.now().isoformat()}],
             "chart_config": result["chart_config"],
             "jira_task":    result.get("jira_task"),
             "created_at":   datetime.now().isoformat(),
         })
         result["dashboard_id"] = dash_id
+
     return jsonify(result)
 
 
@@ -3256,8 +2426,7 @@ def generate_dashboard():
 @login_required
 def list_dashboards():
     dashes = get_user_dashboards()
-    dashboard_items = [v for k, v in dashes.items() if k != "__conversation__"]
-    return jsonify({"dashboards": dashboard_items, "count": len(dashboard_items)})
+    return jsonify({"dashboards": list(dashes.values()), "count": len(dashes)})
 
 
 @app.route("/api/dashboard/<dashboard_id>", methods=["GET"])
@@ -3278,17 +2447,9 @@ def update_dashboard(dashboard_id):
     prompt = (request.get_json() or {}).get("prompt", "").strip()
     if not prompt:
         return jsonify({"error": "Prompt required"}), 400
-
     result = process_prompt(prompt)
-    if result.get("error"):
-        return jsonify({"error": result.get("error")}), 400
-
-    history = dashes[dashboard_id].get("prompt_history") or []
-    history.append({"prompt": prompt, "timestamp": datetime.now().isoformat()})
-
     updates = {
         "prompt": prompt,
-        "prompt_history": history,
         "updated_at": datetime.now().isoformat(),
     }
     if result.get("dashboard_config"):
@@ -3300,16 +2461,6 @@ def update_dashboard(dashboard_id):
     dashes[dashboard_id].update(updates)
     save_user_dashboard(dashboard_id, dashes[dashboard_id])
     return jsonify({"message": "Updated", "dashboard": dashes[dashboard_id]})
-
-
-@app.route("/api/dashboard/<dashboard_id>", methods=["DELETE"])
-@login_required
-def delete_dashboard(dashboard_id):
-    dashes = get_user_dashboards()
-    if dashboard_id not in dashes:
-        return jsonify({"error": "Not found"}), 404
-    del dashes[dashboard_id]
-    return jsonify({"message": "Deleted", "dashboard_id": dashboard_id})
 
 
 @app.route("/api/jira/tasks", methods=["GET"])
@@ -3481,193 +2632,12 @@ def get_project_intelligence():
     if not project_key:
         return jsonify({"error": "No project selected"}), 400
 
-    mode = str(request.args.get("mode", "summary")).strip().lower()
-
     try:
-        if mode == "velocity":
-            return jsonify({
-                "project_key": project_key,
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "sprint_velocity": build_sprint_velocity(project_key),
-            })
-
-        include_velocity = (mode == "full")
-        include_llm = (mode == "full")
-        include_assignment = (mode == "full")
-
-        intelligence = build_project_intelligence(
-            project_key,
-            include_velocity=include_velocity,
-            include_llm=include_llm,
-            include_assignment=include_assignment,
-        )
+        intelligence = build_project_intelligence(project_key)
         return jsonify(intelligence)
     except Exception as e:
         logger.error(f"Project intelligence failed for {project_key}: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/portfolio/intelligence", methods=["GET"])
-@login_required
-def get_portfolio_intelligence():
-    """Return a portfolio-wide health view across accessible Jira projects."""
-    if not get_jira_auth():
-        return jsonify({"error": "Jira not connected"}), 503
-
-    token = session.get("oauth_token", {})
-    cloud_id = session.get("jira_cloud_id")
-    access_token = token.get("access_token", "")
-    if not cloud_id or not access_token:
-        return jsonify({"error": "No Jira site selected"}), 400
-
-    mode = str(request.args.get("mode", "full")).strip().lower()
-    include_llm = mode == "full"
-    max_projects = env_int("PORTFOLIO_MAX_PROJECTS", 10, min_value=1)
-    top_risky_limit = env_int("PORTFOLIO_TOP_RISKY_LIMIT", 5, min_value=1)
-
-    projects = fetch_user_projects(cloud_id, access_token)
-    if not projects:
-        return jsonify({
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "project_count": 0,
-            "evaluated_project_count": 0,
-            "average_health_score": 0,
-            "overall_label": "Watch",
-            "portfolio_risk": "Medium",
-            "risk_breakdown": {"low": 0, "medium": 0, "high": 0},
-            "totals": {"open_issues": 0, "blocked_issues": 0},
-            "top_risky_projects": [],
-            "projects": [],
-            "recommendations": [],
-            "executive_summary": "No accessible projects were found for portfolio analysis.",
-            "analysis_source": "rules",
-        })
-
-    evaluated: List[Dict[str, Any]] = []
-    failed_projects: List[Dict[str, str]] = []
-
-    for project in projects[:max_projects]:
-        key = str(project.get("key", "")).strip().upper()
-        if not key:
-            continue
-        name = str(project.get("name", "")).strip()
-        try:
-            intel = build_project_intelligence(
-                key,
-                include_velocity=False,
-                include_llm=False,
-                include_assignment=False,
-            )
-            evaluated.append({
-                "project_key": key,
-                "project_name": name,
-                "health_score": int(intel.get("health_score", 0) or 0),
-                "health_label": str(intel.get("health_label", "Watch")),
-                "risk_level": str(intel.get("risk_level", "Medium")),
-                "open_issues": int((intel.get("indicators") or {}).get("open_issues", 0) or 0),
-                "blocked_issues": int((intel.get("indicators") or {}).get("blocked_issues", 0) or 0),
-                "completion_rate": float((intel.get("forecast") or {}).get("completion_rate", 0) or 0),
-                "estimated_days_to_clear": (intel.get("forecast") or {}).get("estimated_days_to_clear"),
-            })
-        except Exception as project_error:
-            logger.warning("Portfolio intelligence failed for %s: %s", key, project_error)
-            failed_projects.append({"project_key": key, "error": str(project_error)[:180]})
-
-    if not evaluated:
-        return jsonify({
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "project_count": len(projects),
-            "evaluated_project_count": 0,
-            "average_health_score": 0,
-            "overall_label": "Watch",
-            "portfolio_risk": "Medium",
-            "risk_breakdown": {"low": 0, "medium": 0, "high": 0},
-            "totals": {"open_issues": 0, "blocked_issues": 0},
-            "top_risky_projects": [],
-            "projects": [],
-            "failed_projects": failed_projects,
-            "recommendations": [],
-            "executive_summary": "Portfolio analysis could not be generated from available project data.",
-            "analysis_source": "rules",
-        })
-
-    avg_health = round(sum(p["health_score"] for p in evaluated) / len(evaluated), 1)
-    risk_breakdown = {
-        "low": sum(1 for p in evaluated if str(p.get("risk_level", "")).lower() == "low"),
-        "medium": sum(1 for p in evaluated if str(p.get("risk_level", "")).lower() == "medium"),
-        "high": sum(1 for p in evaluated if str(p.get("risk_level", "")).lower() == "high"),
-    }
-
-    if avg_health >= 80:
-        overall_label = "Good"
-    elif avg_health >= 60:
-        overall_label = "Watch"
-    else:
-        overall_label = "Risk"
-
-    if risk_breakdown["high"] > 0:
-        portfolio_risk = "High"
-    elif risk_breakdown["medium"] > 0:
-        portfolio_risk = "Medium"
-    else:
-        portfolio_risk = "Low"
-
-    total_open = sum(p.get("open_issues", 0) for p in evaluated)
-    total_blocked = sum(p.get("blocked_issues", 0) for p in evaluated)
-
-    top_risky_projects = sorted(
-        evaluated,
-        key=lambda p: (int(p.get("health_score", 0)), -int(p.get("blocked_issues", 0))),
-    )[:top_risky_limit]
-
-    portfolio = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "project_count": len(projects),
-        "evaluated_project_count": len(evaluated),
-        "average_health_score": avg_health,
-        "overall_label": overall_label,
-        "portfolio_risk": portfolio_risk,
-        "risk_breakdown": risk_breakdown,
-        "totals": {
-            "open_issues": total_open,
-            "blocked_issues": total_blocked,
-        },
-        "top_risky_projects": top_risky_projects,
-        "projects": evaluated,
-        "failed_projects": failed_projects,
-        "recommendations": [
-            {
-                "title": "Prioritize high-risk projects",
-                "reason": f"{risk_breakdown['high']} project(s) are currently in High risk.",
-                "impact": "Reduces portfolio-wide delivery slippage.",
-            },
-            {
-                "title": "Address blocker clusters",
-                "reason": f"Portfolio currently has {total_blocked} blocker(s) across active projects.",
-                "impact": "Improves flow and predictability across teams.",
-            },
-        ],
-        "executive_summary": (
-            f"Portfolio health score is {avg_health} across {len(evaluated)} evaluated project(s). "
-            f"Risk split: {risk_breakdown['low']} low, {risk_breakdown['medium']} medium, {risk_breakdown['high']} high."
-        ),
-        "analysis_source": "rules",
-    }
-
-    if include_llm:
-        llm_feedback = llm_summarize_portfolio_intelligence(portfolio)
-        if llm_feedback:
-            portfolio["analysis_source"] = "llm"
-            if llm_feedback.get("executive_summary"):
-                portfolio["executive_summary"] = llm_feedback["executive_summary"]
-            if llm_feedback.get("portfolio_risk"):
-                portfolio["portfolio_risk"] = llm_feedback["portfolio_risk"]
-            if llm_feedback.get("overall_label"):
-                portfolio["overall_label"] = llm_feedback["overall_label"]
-            if llm_feedback.get("recommendations"):
-                portfolio["recommendations"] = llm_feedback["recommendations"]
-
-    return jsonify(portfolio)
 
 
 @app.route("/api/jira/tasks", methods=["POST"])
@@ -3805,94 +2775,50 @@ def export_dashboard(dashboard_id):
     dashes = get_user_dashboards()
     if dashboard_id not in dashes:
         return jsonify({"error": "Not found"}), 404
+    
+    dash = dashes[dashboard_id]
+    cfg = dash.get("chart_config", {})
+    project_key = get_user_project_key()
 
-    try:
-        dash = dashes[dashboard_id]
-        cfg = dash.get("chart_config") or {}
-        # For multi-widget dashboards that have no top-level chart_config,
-        # fall back to the first widget so export still works.
-        if not cfg and dash.get("dashboard_config"):
-            widgets = dash["dashboard_config"].get("widgets") or []
-            if widgets:
-                cfg = dict(widgets[0])
-        project_key = get_user_project_key()
+    # Re-fetch real Jira data for export when possible to avoid exporting sample fallback.
+    prompt = (dash.get("prompt") or "").strip()
+    export_cfg = dict(cfg)
+    fresh_chart_data = ensure_jira_chart_data_for_export(prompt, project_key, {})
 
-        prompt = (dash.get("prompt") or "").strip()
-        export_cfg = dict(cfg)
-        saved_chart_data = {
+    if fresh_chart_data:
+        chart_type = export_cfg.get("chart_type") or detect_chart_type(prompt or "")
+        title = fresh_chart_data.get("title") or export_cfg.get("title") or "Jira Chart"
+        labels = fresh_chart_data.get("labels", [])
+        values = fresh_chart_data.get("values", [])
+
+        export_cfg["title"] = title
+        export_cfg["labels"] = labels
+        export_cfg["values"] = values
+        export_cfg["image_base64"] = generate_chart_b64(chart_type, title, labels, values)
+        export_cfg["data_source"] = "jira_mcp"
+
+        chart_data = {
+            "title": title,
+            "labels": labels,
+            "values": values,
+        }
+    else:
+        # If no fresh Jira data is available and current chart is known sample fallback,
+        # fail explicitly instead of exporting misleading data.
+        if (export_cfg.get("data_source") == "sample_fallback") or (export_cfg.get("title") == "Sample Distribution"):
+            return jsonify({"error": "No real Jira data available for export. Please refresh Jira connection or regenerate dashboard."}), 400
+
+        chart_data = {
             "title": export_cfg.get("title", "Chart"),
             "labels": export_cfg.get("labels", []),
             "values": export_cfg.get("values", []),
         }
-        has_saved_data = bool(saved_chart_data["labels"]) and bool(saved_chart_data["values"])
-        is_sample_data = (export_cfg.get("data_source") == "sample_fallback") or (saved_chart_data["title"] == "Sample Distribution")
-
-        # Preserve parity with the rendered chart whenever we already have real saved data.
-        # Only re-fetch when the saved chart is empty or known sample fallback.
-        fresh_chart_data = None if (has_saved_data and not is_sample_data) else ensure_jira_chart_data_for_export(prompt, project_key, {})
-
-        if fresh_chart_data:
-            chart_type = export_cfg.get("chart_type") or detect_chart_type(prompt or "")
-            title = fresh_chart_data.get("title") or export_cfg.get("title") or "Jira Chart"
-            labels = fresh_chart_data.get("labels", [])
-            values = fresh_chart_data.get("values", [])
-
-            export_cfg["title"] = title
-            export_cfg["labels"] = labels
-            export_cfg["values"] = values
-            export_cfg["image_base64"] = generate_chart_b64(chart_type, title, labels, values)
-            export_cfg["data_source"] = "jira_mcp"
-
-            chart_data = {
-                "title": title,
-                "labels": labels,
-                "values": values,
-            }
-        else:
-            # If neither saved data nor fresh Jira data is available, fail clearly.
-            if is_sample_data and not has_saved_data:
-                return jsonify({"error": "No real Jira data available for export. Please refresh Jira connection or regenerate dashboard."}), 400
-
-            chart_data = saved_chart_data
-
-            if not has_saved_data:
-                return jsonify({"error": "No chart data available for export. Please regenerate dashboard and try again."}), 400
-
-            chart_type = export_cfg.get("chart_type") or detect_chart_type(prompt or "")
-            export_cfg["image_base64"] = generate_chart_b64(
-                chart_type,
-                chart_data.get("title", "Chart"),
-                chart_data.get("labels", []),
-                chart_data.get("values", []),
-            )
-
-        # Create Excel with data table and chart image
-        excel_buf = create_excel_with_chart(chart_data, export_cfg, project_key)
-
-        return send_file(excel_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                         as_attachment=True, download_name=f"dashboard_{dashboard_id}.xlsx")
-    except Exception as export_err:
-        logger.exception("Export failed for dashboard %s: %s", dashboard_id, export_err)
-        return jsonify({"error": f"Export failed: {export_err}"}), 500
-
-
-@app.route("/api/anomalies", methods=["POST"])
-@login_required
-def detect_anomalies():
-    """AI-powered anomaly detection in Jira issues."""
-    data = request.get_json()
-    issues = data.get("issues", [])
-    project_key = data.get("project_key") or get_user_project_key()
     
-    if not issues or not project_key:
-        return jsonify({"anomalies": []}), 400
+    # Create Excel with data table and chart image
+    excel_buf = create_excel_with_chart(chart_data, export_cfg, project_key)
     
-    try:
-        result = llm_detect_anomalies(issues, project_key)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Anomaly detection endpoint failed: {e}")
-        return jsonify({"anomalies": [], "error": str(e)}), 500
+    return send_file(excel_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name=f"dashboard_{dashboard_id}.xlsx")
 
 
 @app.route("/api/metrics", methods=["GET"])

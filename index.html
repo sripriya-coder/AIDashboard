@@ -1,0 +1,3599 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f6f7f3;
+            --surface: #ffffff;
+            --ink: #152238;
+            --muted: #66758f;
+            --line: #e4e9f2;
+            --primary: #0f9d8a;
+            --primary-deep: #0c7d6f;
+            --success: #2eaf74;
+            --info: #2f80ed;
+            --warning: #f0b429;
+            --danger: #e5484d;
+            --accent: #ff6b4a;
+            --shadow-soft: 0 16px 36px rgba(20, 34, 56, 0.08);
+        }
+
+        /* Dark mode colors */
+        body.dark-mode {
+            --bg: #000000;
+            --surface: #1a1a1a;
+            --ink: #ffffff;
+            --muted: #a0a0a0;
+            --line: #333333;
+            --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--ink);
+            background: var(--bg);
+            min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        body:not(.dark-mode) {
+            background:
+                radial-gradient(1200px 500px at 10% -20%, rgba(15, 157, 138, 0.14), transparent 70%),
+                radial-gradient(1000px 500px at 100% 0%, rgba(255, 107, 74, 0.12), transparent 72%),
+                var(--bg);
+        }
+
+        .page {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 24px 20px 32px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Sora', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .card-white {
+            background: linear-gradient(135deg, var(--surface) 0%, rgba(15, 157, 138, 0.02) 100%);
+            border-radius: 18px;
+            padding: 22px;
+            margin-bottom: 18px;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-soft);
+            transition: all 0.2s;
+        }
+
+        .card-white:hover {
+            border-color: rgba(79, 172, 254, 0.4);
+            box-shadow: 0 20px 48px rgba(20, 34, 56, 0.12);
+        }
+
+        body.dark-mode .card-white:hover {
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Metrics */
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .metric-tile {
+            background: linear-gradient(135deg, #ffffff 0%, #fbfcff 100%);
+            border-radius: 14px;
+            padding: 18px 14px;
+            text-align: center;
+            border: 2px solid var(--line);
+            box-shadow: 0 12px 24px rgba(20, 34, 56, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .metric-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 32px rgba(20, 34, 56, 0.12);
+        }
+
+        .metric-tile.t1 {
+            border-color: rgba(15, 157, 138, 0.3);
+            background: linear-gradient(135deg, rgba(15, 157, 138, 0.06) 0%, rgba(46, 175, 116, 0.04) 100%);
+        }
+
+        .metric-tile.t2 {
+            border-color: rgba(46, 175, 116, 0.3);
+            background: linear-gradient(135deg, rgba(46, 175, 116, 0.06) 0%, rgba(15, 157, 138, 0.04) 100%);
+        }
+
+        .metric-tile.t3 {
+            border-color: rgba(47, 128, 237, 0.3);
+            background: linear-gradient(135deg, rgba(47, 128, 237, 0.06) 0%, rgba(79, 172, 254, 0.04) 100%);
+        }
+
+        .metric-tile.t4 {
+            border-color: rgba(255, 107, 74, 0.3);
+            background: linear-gradient(135deg, rgba(255, 107, 74, 0.06) 0%, rgba(255, 159, 128, 0.04) 100%);
+        }
+
+        .metric-num {
+            font-size: 1.9rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--info), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .metric-lbl {
+            font-size: .73rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            margin-top: 8px;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .workspace-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        .workspace-top>.card-white {
+            margin-bottom: 0;
+            height: 100%;
+            min-height: 0;
+        }
+
+        /* Mild multi-color accents for top workspace panels */
+        #intelligencePanel,
+        #promptPanel,
+        #jiraPanel {
+            position: relative;
+        }
+
+        #intelligencePanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(15, 157, 138, 0.08) 100%);
+            border-color: rgba(15, 157, 138, 0.32);
+        }
+
+        #promptPanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(255, 107, 74, 0.08) 100%);
+            border-color: rgba(255, 107, 74, 0.32);
+        }
+
+        #jiraPanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(47, 128, 237, 0.08) 100%);
+            border-color: rgba(47, 128, 237, 0.32);
+        }
+
+        body.dark-mode #intelligencePanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(15, 157, 138, 0.16) 100%);
+        }
+
+        body.dark-mode #promptPanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(255, 107, 74, 0.16) 100%);
+        }
+
+        body.dark-mode #jiraPanel {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(47, 128, 237, 0.16) 100%);
+        }
+
+        body.dark-mode #intelligencePanel h5,
+        body.dark-mode #promptPanel h5,
+        body.dark-mode #jiraPanel h5 {
+            color: #eef4ff;
+        }
+
+        body.dark-mode #intelligencePanel h5 i {
+            color: #facc15 !important;
+        }
+
+        body.dark-mode #promptPanel h5 i {
+            color: #93c5fd !important;
+        }
+
+        body.dark-mode #jiraPanel h5 i {
+            color: #60a5fa !important;
+        }
+
+        .workspace-main {
+            min-width: 0;
+        }
+
+        .workspace-side {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            align-items: start;
+        }
+
+        .project-switch {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--ink);
+            font-size: 0.78rem;
+            padding: 4px 10px;
+            margin-left: 6px;
+            max-width: 220px;
+        }
+
+        .project-switch:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 157, 138, .14);
+        }
+
+        body.dark-mode .project-switch {
+            background: #1f2732;
+            color: #e9f1ff;
+            border-color: #3a4a60;
+        }
+
+        body.dark-mode .project-switch:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, .18);
+        }
+
+        body.dark-mode .project-switch option {
+            background: #1b222d;
+            color: #e9f1ff;
+        }
+
+        body.dark-mode .project-switch:disabled {
+            background: #151b24;
+            color: #9db0c9;
+            border-color: #2f3b4c;
+        }
+
+        /* Prompt */
+        .prompt-area {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 16px;
+            min-height: 120px;
+            line-height: 1.45;
+            font-size: 15px;
+            width: 100%;
+            resize: vertical;
+            transition: border-color .2s, box-shadow .2s;
+            background: #fcfdfd;
+        }
+
+        .prompt-area:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(15, 157, 138, .14);
+        }
+
+        body.dark-mode .prompt-area {
+            background: #1b2430;
+            color: #eaf2ff;
+            border-color: #334255;
+        }
+
+        body.dark-mode .prompt-area::placeholder {
+            color: #9fb2ca;
+        }
+
+        body.dark-mode .prompt-area:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, .18);
+        }
+
+        .btn-gen {
+            background: linear-gradient(120deg, var(--primary), var(--primary-deep));
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s, filter .2s;
+        }
+
+        .btn-gen:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(15, 157, 138, .35);
+        }
+
+        .btn-gen:active {
+            transform: translateY(0);
+        }
+
+        /* Quick buttons */
+        .quick-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .qbtn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 16px;
+            color: var(--ink);
+            background: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .16s, border-color .16s, background .16s;
+            font-size: .84rem;
+        }
+
+        .qbtn:hover {
+            transform: translateY(-1px);
+            border-color: var(--primary);
+        }
+
+        .qbtn.pie {
+            background: rgba(47, 128, 237, .1);
+        }
+
+        .qbtn.bar {
+            background: rgba(255, 107, 74, .12);
+        }
+
+        .qbtn.metrics {
+            background: rgba(15, 157, 138, .12);
+        }
+
+        .qbtn.jira {
+            background: rgba(240, 180, 41, .16);
+        }
+
+        /* Example prompts */
+        .eg-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 16px;
+            border: 1px solid var(--line);
+        }
+
+        .eg-item {
+            background: #fff;
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 7px;
+            cursor: pointer;
+            border: 1px solid var(--line);
+            transition: all .18s;
+            font-size: .88rem;
+        }
+
+        .eg-item:hover {
+            background: #f2fbf9;
+            border-color: var(--primary);
+            color: var(--ink);
+        }
+
+        body.dark-mode .eg-box {
+            background: #1a2330;
+            border-color: #334255;
+        }
+
+        body.dark-mode .eg-item {
+            background: #202b3a;
+            color: #eaf2ff;
+            border-color: #334255;
+        }
+
+        body.dark-mode .eg-item:hover {
+            background: #273447;
+            border-color: #4f89d9;
+            color: #f3f8ff;
+        }
+
+        /* Chart */
+        .chart-box {
+            min-height: 340px;
+            background: #f8fafc;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border: 1px dashed #d8e0ee;
+        }
+
+        .chart-img {
+            max-width: 100%;
+            max-height: 420px;
+            border-radius: 10px;
+            object-fit: contain;
+        }
+
+        .chart-placeholder {
+            text-align: center;
+            color: #a7b3c8;
+        }
+
+        /* Action buttons */
+        .act {
+            border: none;
+            border-radius: 10px;
+            padding: 8px 13px;
+            font-weight: 700;
+            font-size: .82rem;
+            cursor: pointer;
+            color: #fff;
+            transition: transform .16s, filter .16s;
+        }
+
+        .act:hover {
+            transform: translateY(-1px);
+            filter: saturate(1.04);
+        }
+
+        .act.export {
+            background: var(--success);
+        }
+
+        .act.jira {
+            background: var(--info);
+        }
+
+        .act.update {
+            background: var(--warning);
+            color: #2c2c2c;
+        }
+
+        .act.del {
+            background: var(--danger);
+        }
+
+        /* Jira task cards */
+        .jira-card {
+            background: #f9fbff;
+            border-radius: 12px;
+            padding: 13px 15px;
+            margin-bottom: 10px;
+            border: 1px solid #dfe8f7;
+            border-left: 4px solid var(--info);
+        }
+
+        body.dark-mode .jira-card {
+            background: #1d2734;
+            border-color: #314055;
+            color: #eaf2ff;
+        }
+
+        body.dark-mode .jira-card .small {
+            color: #d4e1f5;
+        }
+
+        body.dark-mode .jira-key {
+            color: #7cc4ff;
+        }
+
+        .intel-hero {
+            display: grid;
+            grid-template-columns: 88px minmax(0, 1fr);
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .intel-score {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #ffffff 0%, #f5fbfa 100%);
+            border: 6px solid #d8efe9;
+            color: var(--primary-deep);
+            box-shadow: 0 10px 22px rgba(15, 157, 138, 0.12);
+        }
+
+        .intel-score.risk-low {
+            border-color: rgba(46, 175, 116, 0.28);
+            color: var(--success);
+        }
+
+        .intel-score.risk-medium {
+            border-color: rgba(240, 180, 41, 0.3);
+            color: #b38316;
+        }
+
+        .intel-score.risk-high {
+            border-color: rgba(229, 72, 77, 0.28);
+            color: var(--danger);
+        }
+
+        .intel-score-value {
+            font-size: 1.65rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .intel-score-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-top: 5px;
+        }
+
+        .intel-summary {
+            font-size: 0.88rem;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        body.dark-mode .intel-summary {
+            color: #d4e1f5;
+        }
+
+        .intel-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .intel-pill {
+            background: linear-gradient(135deg, #f9faff 0%, #f3f4ff 100%);
+            border: 2px solid rgba(79, 172, 254, 0.2);
+            border-radius: 12px;
+            padding: 12px 10px;
+            transition: all 0.2s;
+        }
+
+        .intel-pill:hover {
+            border-color: rgba(79, 172, 254, 0.6);
+            background: linear-gradient(135deg, #f0f8ff 0%, #f3f4ff 100%);
+        }
+
+        .intel-pill strong {
+            display: block;
+            font-size: 1rem;
+            color: var(--ink);
+        }
+
+        .intel-pill span {
+            font-size: 0.72rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        body.dark-mode .intel-pill {
+            background: linear-gradient(135deg, #202b3a 0%, #1a2432 100%);
+            border-color: #334255;
+        }
+
+        body.dark-mode .intel-pill:hover {
+            background: linear-gradient(135deg, #263446 0%, #1f2c3d 100%);
+            border-color: #4f89d9;
+        }
+
+        body.dark-mode .intel-pill strong {
+            color: #f3f8ff;
+        }
+
+        body.dark-mode .intel-pill span {
+            color: #aac0da;
+        }
+
+        .intel-section-title {
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 8px;
+        }
+
+        .intel-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .intel-item {
+            background: #f9fbff;
+            border: 1px solid #dfe8f7;
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .intel-item strong {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--ink);
+            margin-bottom: 3px;
+        }
+
+        .intel-item p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        body.dark-mode .intel-item {
+            background: #202b3a;
+            border-color: #334255;
+        }
+
+        body.dark-mode .intel-item strong {
+            color: #f3f8ff;
+        }
+
+        body.dark-mode .intel-item p {
+            color: #c3d4ea;
+        }
+
+        .intel-highlight {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 6px 10px;
+            margin: 0 6px 6px 0;
+            font-size: 0.76rem;
+            background: rgba(47, 128, 237, 0.1);
+            color: #275eab;
+        }
+
+        body.dark-mode .intel-highlight {
+            background: rgba(96, 165, 250, 0.2);
+            color: #dbeafe;
+        }
+
+        .jira-key {
+            font-weight: 800;
+            color: var(--info);
+            text-decoration: none;
+        }
+
+        .jira-key:hover {
+            text-decoration: underline;
+        }
+
+        .jira-pager {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+        }
+
+        .jira-pager-info {
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        .jira-pager-controls {
+            display: flex;
+            gap: 6px;
+        }
+
+        .jira-pager-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--ink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all .16s;
+        }
+
+        .jira-pager-btn i {
+            color: currentColor;
+            opacity: 1;
+        }
+
+        .jira-pager-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .jira-pager-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        body.dark-mode .jira-pager-btn {
+            background: #1f2732;
+            border-color: #34445a;
+            color: #e7eef9;
+        }
+
+        body.dark-mode .jira-pager-btn:hover:not(:disabled) {
+            border-color: #60a5fa;
+            color: #93c5fd;
+            background: #273244;
+        }
+
+        body.dark-mode .jira-pager-btn:disabled {
+            background: #151c26;
+            color: #8aa0bc;
+            border-color: #2a3748;
+            opacity: .7;
+        }
+
+        /* Executive board */
+        .executive-board {
+            display: none;
+            margin-bottom: 12px;
+        }
+
+        body.density-executive .executive-board {
+            display: block;
+        }
+
+        .exec-board-wrap {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+            background:
+                radial-gradient(760px 240px at 8% -30%, rgba(15, 157, 138, 0.18), transparent 70%),
+                radial-gradient(680px 220px at 95% 0%, rgba(46, 175, 116, 0.14), transparent 72%),
+                linear-gradient(180deg, #ffffff 0%, #f5fcfa 100%);
+            border-color: rgba(15, 157, 138, 0.28);
+        }
+
+        body.dark-mode .exec-board-wrap {
+            background:
+                radial-gradient(760px 240px at 8% -30%, rgba(15, 157, 138, 0.26), transparent 70%),
+                radial-gradient(680px 220px at 95% 0%, rgba(46, 175, 116, 0.2), transparent 72%),
+                linear-gradient(180deg, #1b1f1c 0%, #161a18 100%);
+            border-color: rgba(46, 175, 116, 0.35);
+        }
+
+        .exec-board-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .ai-result-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 0.66rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #0f172a;
+            background: linear-gradient(90deg, #67e8f9 0%, #a78bfa 100%);
+            border: 1px solid rgba(103, 232, 249, 0.45);
+            vertical-align: middle;
+        }
+
+        body.dark-mode .ai-result-badge {
+            color: #eaf2ff;
+            background: linear-gradient(90deg, rgba(34, 211, 238, 0.28) 0%, rgba(167, 139, 250, 0.28) 100%);
+            border-color: rgba(147, 197, 253, 0.45);
+        }
+
+        .exec-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .exec-kpi {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+            background: #fff;
+        }
+
+        .exec-kpi strong {
+            display: block;
+            font-size: 1.1rem;
+            line-height: 1.1;
+            color: var(--ink);
+        }
+
+        .exec-kpi span {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: var(--muted);
+        }
+
+        .exec-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .exec-widget {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ffffff 0%, #f9faff 100%);
+            padding: 12px;
+            min-height: 150px;
+            border-left: 5px solid #4e73df;
+            transition: transform 0.2s, box-shadow 0.2s, border-left-color 0.2s;
+            box-shadow: 0 4px 12px rgba(20, 34, 56, 0.05);
+        }
+
+        .exec-widget:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(20, 34, 56, 0.1);
+        }
+
+        .exec-widget.exec-wide {
+            grid-column: span 2;
+        }
+
+        .exec-prompt-widget {
+            min-height: 210px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .exec-prompt-ideas .exec-mini-list li {
+            border-left-color: #3b82f6;
+        }
+
+        .exec-compact-text {
+            display: -webkit-box;
+            line-clamp: 4;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        .exec-widget:nth-child(1) {
+            border-left-color: #3b82f6;
+        }
+
+        .exec-widget:nth-child(2) {
+            border-left-color: #7c3aed;
+        }
+
+        .exec-widget:nth-child(3) {
+            border-left-color: #f59e0b;
+        }
+
+        .exec-widget:nth-child(4) {
+            border-left-color: #ec4899;
+        }
+
+        .exec-widget:nth-child(5) {
+            border-left-color: #10b981;
+        }
+
+        .exec-widget:nth-child(6) {
+            border-left-color: #f97316;
+        }
+
+        .exec-widget:nth-child(7) {
+            border-left-color: #8b5cf6;
+        }
+
+        .exec-widget:nth-child(8) {
+            border-left-color: #06b6d4;
+        }
+
+        .exec-widget:nth-child(9) {
+            border-left-color: #14b8a6;
+        }
+
+        .exec-widget:nth-child(10) {
+            border-left-color: #6366f1;
+        }
+
+        .exec-widget:nth-child(1) {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(96, 165, 250, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(2) {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(167, 139, 250, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(3) {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(251, 191, 36, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(4) {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.12) 0%, rgba(244, 114, 182, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(5) {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(52, 211, 153, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(6) {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(251, 146, 60, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(7) {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(196, 181, 253, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(8) {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(34, 211, 238, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(9) {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(45, 212, 191, 0.06) 100%);
+        }
+
+        .exec-widget:nth-child(10) {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(129, 140, 248, 0.06) 100%);
+        }
+
+        .exec-widget.exec-releases-widget {
+            border-left-color: #0ea5e9;
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.14) 0%, rgba(56, 189, 248, 0.07) 100%);
+        }
+
+        .exec-widget.exec-focus-widget {
+            border-left-color: #22c55e;
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(74, 222, 128, 0.07) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(1) {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.24) 0%, rgba(96, 165, 250, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(2) {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.24) 0%, rgba(167, 139, 250, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(3) {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.24) 0%, rgba(251, 191, 36, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(4) {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.24) 0%, rgba(244, 114, 182, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(5) {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.24) 0%, rgba(52, 211, 153, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(6) {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.24) 0%, rgba(251, 146, 60, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(7) {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.24) 0%, rgba(196, 181, 253, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(8) {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.24) 0%, rgba(34, 211, 238, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(9) {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.24) 0%, rgba(45, 212, 191, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget:nth-child(10) {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.24) 0%, rgba(129, 140, 248, 0.12) 100%);
+        }
+
+        body.dark-mode .exec-widget.exec-releases-widget {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.26) 0%, rgba(56, 189, 248, 0.13) 100%);
+        }
+
+        body.dark-mode .exec-widget.exec-focus-widget {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.26) 0%, rgba(74, 222, 128, 0.13) 100%);
+        }
+
+        body.dark-mode .exec-widget {
+            color: #e7eef9;
+        }
+
+        body.dark-mode .exec-widget strong {
+            color: #f5f9ff;
+        }
+
+        .exec-widget h6 {
+            margin: -12px -12px 8px -12px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            border-radius: 12px 12px 0 0;
+            color: white;
+            font-weight: 700;
+        }
+
+        .exec-widget:nth-child(1) h6 {
+            background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+        }
+
+        .exec-widget:nth-child(2) h6 {
+            background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+        }
+
+        .exec-widget:nth-child(3) h6 {
+            background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+        }
+
+        .exec-widget:nth-child(4) h6 {
+            background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
+        }
+
+        .exec-widget:nth-child(5) h6 {
+            background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+        }
+
+        .exec-widget:nth-child(6) h6 {
+            background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+        }
+
+        .exec-widget:nth-child(7) h6 {
+            background: linear-gradient(90deg, #8b5cf6 0%, #c4b5fd 100%);
+        }
+
+        .exec-widget:nth-child(8) h6 {
+            background: linear-gradient(90deg, #06b6d4 0%, #22d3ee 100%);
+        }
+
+        .exec-widget:nth-child(9) h6 {
+            background: linear-gradient(90deg, #14b8a6 0%, #2dd4bf 100%);
+        }
+
+        .exec-widget:nth-child(10) h6 {
+            background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
+        }
+
+        .exec-widget.exec-releases-widget h6 {
+            background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%);
+        }
+
+        .exec-widget.exec-focus-widget h6 {
+            background: linear-gradient(90deg, #16a34a 0%, #4ade80 100%);
+        }
+
+        body.dark-mode .exec-widget .text-muted {
+            color: #b7c6da !important;
+        }
+
+        .exec-mini-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 7px;
+        }
+
+        .exec-mini-list li {
+            font-size: 0.8rem;
+            color: var(--ink);
+            background: linear-gradient(135deg, #ffffff 0%, #f9faff 100%);
+            border: 1px solid rgba(228, 233, 242, 0.6);
+            border-left: 3px solid #e879f9;
+            border-radius: 8px;
+            padding: 7px 8px;
+            transition: all 0.2s;
+        }
+
+        .exec-mini-list li:hover {
+            border-left-color: #4f46e5;
+            background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+        }
+
+        body.dark-mode .exec-mini-list li {
+            color: #e7eef9;
+            background: linear-gradient(135deg, #1f2732 0%, #1a2230 100%);
+            border-color: #314055;
+            border-left-color: #60a5fa;
+        }
+
+        body.dark-mode .exec-mini-list li:hover {
+            background: linear-gradient(135deg, #253041 0%, #1e2a3a 100%);
+            border-left-color: #93c5fd;
+        }
+
+        .exec-two-col {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .exec-datum {
+            border-radius: 8px;
+            border: 1px solid rgba(228, 233, 242, 0.6);
+            background: linear-gradient(135deg, #f9faff 0%, #f3f4ff 100%);
+            padding: 10px 8px;
+            font-size: 0.76rem;
+            color: var(--muted);
+            transition: all 0.2s;
+        }
+
+        .exec-datum:hover {
+            border-color: rgba(79, 172, 254, 0.4);
+            background: linear-gradient(135deg, #f0f8ff 0%, #f3f4ff 100%);
+        }
+
+        .exec-datum strong {
+            display: block;
+            color: var(--ink);
+            font-size: 0.98rem;
+            background: linear-gradient(90deg, var(--primary), var(--info));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.dark-mode .exec-datum {
+            color: #b7c6da;
+            border-color: #314055;
+            background: linear-gradient(135deg, #1f2732 0%, #1a2230 100%);
+        }
+
+        body.dark-mode .exec-datum:hover {
+            border-color: #4f89d9;
+            background: linear-gradient(135deg, #253041 0%, #1e2a3a 100%);
+        }
+
+        body.dark-mode .exec-datum strong {
+            color: #f5f9ff;
+            background: none;
+            -webkit-text-fill-color: initial;
+        }
+
+        .exec-mix-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .exec-mix-col {
+            border: 1px solid rgba(228, 233, 242, 0.6);
+            border-radius: 8px;
+            padding: 10px;
+            background: linear-gradient(135deg, #f9faff 0%, #f3f4ff 100%);
+            transition: all 0.2s;
+        }
+
+        .exec-mix-col:hover {
+            border-color: rgba(79, 172, 254, 0.4);
+            background: linear-gradient(135deg, #f0f8ff 0%, #f3f4ff 100%);
+        }
+
+        body.dark-mode .exec-mix-col {
+            border-color: #314055;
+            background: linear-gradient(135deg, #1f2732 0%, #1a2230 100%);
+        }
+
+        body.dark-mode .exec-mix-col:hover {
+            border-color: #4f89d9;
+            background: linear-gradient(135deg, #253041 0%, #1e2a3a 100%);
+        }
+
+        .exec-mix-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin-bottom: 6px;
+            font-weight: 800;
+        }
+
+        .exec-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .exec-table td {
+            font-size: 0.78rem;
+            border-bottom: 1px solid var(--line);
+            padding: 6px 4px;
+            vertical-align: top;
+        }
+
+        .exec-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        body.dark-mode .exec-table td {
+            color: #e7eef9;
+            border-bottom-color: #314055;
+        }
+
+        .exec-util-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .exec-util-name {
+            width: 110px;
+            font-size: 0.76rem;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .exec-util-track {
+            flex: 1;
+            height: 10px;
+            border-radius: 999px;
+            background: #eef3fb;
+            overflow: hidden;
+            border: 1px solid var(--line);
+        }
+
+        body.dark-mode .exec-util-track {
+            background: #1d2633;
+            border-color: #314055;
+        }
+
+        body.dark-mode .exec-util-name,
+        body.dark-mode .exec-util-pct {
+            color: #dbe7f8;
+        }
+
+        .exec-util-fill {
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .exec-util-fill.low {
+            background: linear-gradient(90deg, #2eaf74, #4ec88c);
+        }
+
+        .exec-util-fill.medium {
+            background: linear-gradient(90deg, #f0b429, #f6c65f);
+        }
+
+        .exec-util-fill.high {
+            background: linear-gradient(90deg, #e5484d, #f06d72);
+        }
+
+        .exec-util-pct {
+            width: 42px;
+            text-align: right;
+            font-size: 0.74rem;
+            color: var(--ink);
+            font-weight: 700;
+        }
+
+        /* Query result card */
+        #resultsArea {
+            display: grid;
+            gap: 14px;
+            margin-top: 10px;
+        }
+
+        .q-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fcff 100%);
+            border-radius: 14px;
+            padding: 16px;
+            border: 1px solid rgba(47, 128, 237, 0.22);
+            border-left: 6px solid var(--info);
+            box-shadow: 0 12px 30px rgba(20, 34, 56, .08);
+            animation: riseIn .35s ease;
+            position: relative;
+        }
+
+        .q-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .q-card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .q-card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .q-chip {
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 5px 9px;
+            border: 1px solid transparent;
+        }
+
+        .q-chip.type {
+            background: rgba(47, 128, 237, 0.12);
+            border-color: rgba(47, 128, 237, 0.3);
+            color: #225ea8;
+        }
+
+        .q-chip.count {
+            background: rgba(46, 175, 116, 0.12);
+            border-color: rgba(46, 175, 116, 0.3);
+            color: #1f7b4f;
+        }
+
+        .q-chip.time {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #9f6800;
+        }
+
+        .q-dismiss-btn {
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: #fff;
+            color: var(--muted);
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 6px 10px;
+            transition: all .16s;
+        }
+
+        .q-dismiss-btn:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+            transform: translateY(-1px);
+        }
+
+        .q-card-note {
+            margin-bottom: 10px;
+            font-size: 0.79rem;
+            color: var(--muted);
+            background: rgba(47, 128, 237, 0.08);
+            border: 1px dashed rgba(47, 128, 237, 0.25);
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+
+        .q-card pre {
+            margin: 0;
+            white-space: pre-wrap;
+            font-family: inherit;
+            font-size: .88rem;
+            color: var(--ink);
+        }
+
+        .q-card-new {
+            animation: qPulse .6s ease;
+        }
+
+        @keyframes qPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(47, 128, 237, 0.32);
+            }
+
+            100% {
+                box-shadow: 0 0 0 16px rgba(47, 128, 237, 0);
+            }
+        }
+
+        body.dark-mode .q-card {
+            background: linear-gradient(135deg, #1d232c 0%, #1a2028 100%);
+            border-color: rgba(96, 165, 250, 0.34);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .35);
+        }
+
+        body.dark-mode .q-dismiss-btn {
+            background: #15191f;
+            border-color: #313b49;
+            color: #c4cfdd;
+        }
+
+        body.dark-mode .q-card-note {
+            background: rgba(96, 165, 250, 0.12);
+            border-color: rgba(96, 165, 250, 0.28);
+            color: #d9e9ff;
+        }
+
+        .table-dark {
+            --bs-table-bg: #1f2f46;
+        }
+
+        .table> :not(caption)>*>* {
+            padding: .62rem .56rem;
+        }
+
+        .badge {
+            font-weight: 600;
+            letter-spacing: .01em;
+        }
+
+        /* Toast */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            min-width: 260px;
+            border-radius: 12px;
+            padding: 13px 18px;
+            color: #fff;
+            font-weight: 700;
+            display: none;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, .2);
+        }
+
+        #toast.success {
+            background: var(--success);
+        }
+
+        #toast.danger {
+            background: var(--danger);
+        }
+
+        #toast.info {
+            background: var(--info);
+        }
+
+        #toast.warning {
+            background: #b38316;
+        }
+
+        /* Spinner */
+        #spinner {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 33, 56, .24);
+            backdrop-filter: blur(5px);
+            z-index: 8888;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #spinner.on {
+            display: flex;
+        }
+
+        .spin-card {
+            background: rgba(255, 255, 255, .97);
+            border-radius: 16px;
+            padding: 30px 38px;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, .22);
+            border: 1px solid #e6ecf7;
+        }
+
+        .hero-head {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(15, 157, 138, 0.09) 55%, rgba(46, 175, 116, 0.08) 100%);
+            border-color: rgba(15, 157, 138, 0.3);
+        }
+
+        body.dark-mode .hero-head {
+            background: linear-gradient(140deg, var(--surface) 0%, rgba(15, 157, 138, 0.2) 55%, rgba(46, 175, 116, 0.18) 100%);
+            border-color: rgba(46, 175, 116, 0.36);
+        }
+
+        .hero-title {
+            background: linear-gradient(120deg, #0f9d8a 0%, #2eaf74 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-meta-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .hero-head::after {
+            content: "";
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle, rgba(15, 157, 138, .12), transparent 72%);
+            right: -90px;
+            top: -130px;
+            pointer-events: none;
+        }
+
+        .dark-mode-toggle,
+        .accessibility-toggle {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+        .dark-mode-toggle:hover,
+        .accessibility-toggle:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        body.dark-mode .dark-mode-toggle,
+        body.dark-mode .accessibility-toggle {
+            background: #1f2732;
+            border-color: #3a4a60;
+            color: #e9f1ff;
+        }
+
+        .accessibility-toggle.active {
+            border-color: #0f766e;
+            background: linear-gradient(120deg, rgba(15, 157, 138, 0.14), rgba(46, 175, 116, 0.16));
+            color: #065f46;
+        }
+
+        body.dark-mode .accessibility-toggle.active {
+            border-color: #67e8f9;
+            background: linear-gradient(120deg, rgba(45, 212, 191, 0.24), rgba(103, 232, 249, 0.22));
+            color: #dcfce7;
+        }
+
+        .view-mode-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px;
+            background: #fbfdff;
+        }
+
+        .view-mode-btn {
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all .16s;
+        }
+
+        .view-mode-btn.active {
+            color: #fff;
+            background: linear-gradient(120deg, var(--primary), var(--primary-deep));
+            box-shadow: 0 8px 16px rgba(15, 157, 138, .25);
+        }
+
+        body.accessibility-mode {
+            --bg: #ffffff;
+            --surface: #ffffff;
+            --ink: #0b0b0b;
+            --muted: #1f2937;
+            --line: #111827;
+            --primary: #005fcc;
+            --primary-deep: #00479a;
+            --success: #0b7a35;
+            --info: #005fcc;
+            --warning: #9a6700;
+            --danger: #b91c1c;
+            --shadow-soft: none;
+            font-size: 18px;
+            line-height: 1.7;
+            letter-spacing: 0.01em;
+        }
+
+        body.accessibility-mode,
+        body.accessibility-mode body,
+        body.accessibility-mode .card-white,
+        body.accessibility-mode .metric-tile,
+        body.accessibility-mode .q-card,
+        body.accessibility-mode .exec-widget,
+        body.accessibility-mode .jira-card,
+        body.accessibility-mode .prompt-area,
+        body.accessibility-mode .qbtn,
+        body.accessibility-mode .btn,
+        body.accessibility-mode .btn-gen,
+        body.accessibility-mode .project-switch {
+            background-image: none !important;
+        }
+
+        body.accessibility-mode .card-white,
+        body.accessibility-mode .metric-tile,
+        body.accessibility-mode .q-card,
+        body.accessibility-mode .exec-widget,
+        body.accessibility-mode .jira-card,
+        body.accessibility-mode .prompt-area,
+        body.accessibility-mode .project-switch,
+        body.accessibility-mode .jira-pager-btn,
+        body.accessibility-mode .q-dismiss-btn,
+        body.accessibility-mode .view-mode-group,
+        body.accessibility-mode .view-mode-btn,
+        body.accessibility-mode .dark-mode-toggle,
+        body.accessibility-mode .accessibility-toggle {
+            border-width: 2px !important;
+            box-shadow: none !important;
+        }
+
+        body.accessibility-mode .metric-num,
+        body.accessibility-mode .exec-datum strong,
+        body.accessibility-mode .hero-title {
+            background: none !important;
+            -webkit-text-fill-color: currentColor !important;
+        }
+
+        body.accessibility-mode .btn,
+        body.accessibility-mode .btn-gen,
+        body.accessibility-mode .qbtn,
+        body.accessibility-mode .act,
+        body.accessibility-mode .project-switch,
+        body.accessibility-mode .prompt-area,
+        body.accessibility-mode .eg-item,
+        body.accessibility-mode .jira-pager-btn,
+        body.accessibility-mode .q-dismiss-btn {
+            font-size: 1rem !important;
+            line-height: 1.6;
+        }
+
+        body.accessibility-mode .btn,
+        body.accessibility-mode .btn-gen,
+        body.accessibility-mode .qbtn,
+        body.accessibility-mode .act,
+        body.accessibility-mode .jira-pager-btn,
+        body.accessibility-mode .q-dismiss-btn,
+        body.accessibility-mode .dark-mode-toggle,
+        body.accessibility-mode .accessibility-toggle {
+            min-height: 44px;
+        }
+
+        body.accessibility-mode .metric-lbl,
+        body.accessibility-mode .q-chip,
+        body.accessibility-mode .exec-mix-title,
+        body.accessibility-mode .intel-section-title {
+            font-size: 0.85rem !important;
+            letter-spacing: 0.05em;
+            color: #111827;
+        }
+
+        body.accessibility-mode *:focus-visible {
+            outline: 3px solid #1d4ed8;
+            outline-offset: 3px;
+        }
+
+        body.accessibility-mode,
+        body.accessibility-mode * {
+            transition: none !important;
+            animation: none !important;
+            scroll-behavior: auto !important;
+        }
+
+        body.density-compact .page,
+        body.density-executive .page {
+            max-width: 1260px;
+            padding: 16px 14px 20px;
+        }
+
+        body.density-compact .card-white,
+        body.density-executive .card-white {
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        body.density-compact .metric-row,
+        body.density-executive .metric-row {
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        body.density-compact .metric-tile,
+        body.density-executive .metric-tile {
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        body.density-compact .metric-num,
+        body.density-executive .metric-num {
+            font-size: 1.35rem;
+        }
+
+        body.density-compact .metric-lbl,
+        body.density-executive .metric-lbl {
+            font-size: 0.64rem;
+        }
+
+        body.density-compact .workspace-grid,
+        body.density-compact .workspace-side,
+        body.density-executive .workspace-grid,
+        body.density-executive .workspace-side {
+            gap: 12px;
+        }
+
+        body.density-compact .workspace-top {
+            gap: 12px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+        }
+
+        body.density-compact .workspace-top>.card-white {
+            height: clamp(430px, 58vh, 560px);
+            overflow: hidden;
+        }
+
+        body.density-compact #intelligencePanel,
+        body.density-compact #jiraPanel,
+        body.density-compact #promptPanel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.density-compact #intelligenceContent,
+        body.density-compact #jiraList {
+            flex: 1;
+            min-height: 0;
+            padding-right: 4px;
+        }
+
+        body.density-compact #intelligenceContent,
+        body.density-compact #jiraList {
+            overflow-y: auto;
+        }
+
+        body.density-compact .prompt-area,
+        body.density-executive .prompt-area {
+            min-height: 86px;
+            font-size: 13px;
+            padding: 12px;
+        }
+
+        body.density-compact .quick-row,
+        body.density-executive .quick-row {
+            margin-top: 10px;
+            gap: 8px;
+        }
+
+        body.density-compact .qbtn,
+        body.density-executive .qbtn {
+            padding: 6px 12px;
+            font-size: 0.74rem;
+        }
+
+        body.density-compact .eg-box,
+        body.density-executive .eg-box {
+            margin-top: 10px;
+            padding: 10px;
+        }
+
+        body.density-compact .eg-item,
+        body.density-executive .eg-item {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        body.density-compact .jira-card,
+        body.density-executive .jira-card {
+            padding: 10px 11px;
+            margin-bottom: 7px;
+        }
+
+        body.density-executive .workspace-top {
+            gap: 12px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+        }
+
+        body.density-executive .workspace-top {
+            display: none;
+        }
+
+        body.density-executive #resultsArea {
+            display: none;
+        }
+
+        body.density-executive .workspace-top>.card-white {
+            height: clamp(430px, 58vh, 560px);
+            overflow: hidden;
+        }
+
+        body.density-executive #intelligencePanel,
+        body.density-executive #jiraPanel,
+        body.density-executive #promptPanel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.density-executive #intelligenceContent,
+        body.density-executive #jiraList {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        @keyframes riseIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1120px) {
+            .workspace-top {
+                grid-template-columns: 1fr;
+            }
+
+            .exec-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .exec-widget.exec-wide {
+                grid-column: span 2;
+            }
+
+            body.density-compact .workspace-top {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            body.density-executive .workspace-top {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .workspace-side {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 920px) {
+            .metric-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 620px) {
+            .page {
+                padding: 14px 12px 20px;
+            }
+
+            .hero-meta-line {
+                flex-wrap: wrap;
+                white-space: normal;
+            }
+
+            .exec-kpi-row,
+            .exec-grid,
+            .exec-two-col {
+                grid-template-columns: 1fr;
+            }
+
+            .exec-widget.exec-wide {
+                grid-column: span 1;
+            }
+
+            body.density-compact .workspace-top {
+                grid-template-columns: 1fr;
+            }
+
+            body.density-executive .workspace-top {
+                grid-template-columns: 1fr;
+            }
+
+            body.density-compact .workspace-top>.card-white {
+                height: auto;
+                overflow: visible;
+            }
+
+            body.density-executive .workspace-top>.card-white {
+                height: auto;
+                overflow: visible;
+            }
+
+            .view-mode-group {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .view-mode-btn {
+                flex: 1;
+            }
+
+            .card-white {
+                padding: 16px;
+                border-radius: 14px;
+            }
+
+            .q-card {
+                padding: 14px;
+            }
+
+            .q-card-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .q-dismiss-btn {
+                width: 100%;
+            }
+
+            .metric-row {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-gen,
+            .btn.btn-outline-warning {
+                width: 100%;
+            }
+
+            .d-flex.gap-3.mt-3.flex-wrap.align-items-center {
+                display: grid !important;
+                gap: 10px !important;
+            }
+
+            #toast {
+                right: 12px;
+                left: 12px;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+
+<body class="density-compact">
+    <div class="page">
+
+        <!-- Header: title row + single controls row -->
+        <div class="card-white hero-head" style="padding-top:.6rem;padding-bottom:.6rem">
+            <!-- Row 1: Title + badges right-aligned -->
+            <div class="d-flex align-items-center mb-1" style="gap:.5rem">
+                <h2 class="mb-0 hero-title" style="font-weight:700;flex-shrink:0">
+                    <i class="bi bi-graph-up"></i> Dashboard Generator
+                </h2>
+                <div style="flex:1"></div>
+                <span class="badge" style="background:var(--success);flex-shrink:0"><i
+                        class="bi bi-shield-lock-fill me-1"></i>OAuth</span>
+                <span class="badge" style="background:var(--info);flex-shrink:0"><i class="bi bi-robot me-1"></i>AI +
+                    MCP</span>
+            </div>
+            <!-- Row 2: everything on one line -->
+            <div class="d-flex align-items-center gap-2" style="flex-wrap:nowrap;overflow-x:auto;min-width:0">
+                <!-- Site -->
+                <span class="small" style="color:var(--muted);white-space:nowrap;flex-shrink:0">
+                    <i class="bi bi-building me-1"></i><strong>{{ site }}</strong>
+                </span>
+                <span style="color:var(--muted);flex-shrink:0">&nbsp;·&nbsp;</span>
+                <!-- Project + switcher -->
+                <span class="small hero-meta-line" style="color:var(--muted);flex-shrink:0">
+                    <i class="bi bi-folder me-1"></i><strong id="projectNameText">{{ project_name or project_key
+                        }}</strong>
+                    <select id="projectSwitcher" class="project-switch" title="Switch project"
+                        onchange="switchProject(this.value)">
+                        {% if project_key %}
+                        <option value="{{ project_key }}">{{ project_key }}{% if project_name %} — {{ project_name }}{%
+                            endif %}</option>
+                        {% else %}
+                        <option value="">Select project</option>
+                        {% endif %}
+                    </select>
+                </span>
+                <!-- spacer -->
+                <div style="flex:1;min-width:.25rem"></div>
+                <!-- Density -->
+                <span class="small text-uppercase"
+                    style="color:var(--muted);letter-spacing:.09em;font-weight:700;white-space:nowrap;flex-shrink:0">Density</span>
+                <div class="view-mode-group" role="tablist" aria-label="Dashboard density mode" style="flex-shrink:0">
+                    <button class="view-mode-btn" data-mode="compact"
+                        onclick="setDensityMode('compact')">Compact</button>
+                    <button class="view-mode-btn" data-mode="executive"
+                        onclick="setDensityMode('executive')">Executive</button>
+                </div>
+                <!-- Toggles -->
+                <button class="dark-mode-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Toggle dark mode"
+                    aria-label="Toggle dark mode" aria-pressed="false" style="flex-shrink:0">
+                    <i class="bi bi-moon-stars"></i>
+                </button>
+                <button class="accessibility-toggle" id="accessibilityToggle" onclick="toggleAccessibilityMode()"
+                    title="Toggle accessibility mode" aria-label="Toggle accessibility mode" aria-pressed="false"
+                    style="flex-shrink:0">
+                    <i class="bi bi-universal-access"></i>
+                </button>
+                <!-- User -->
+                <div class="d-flex align-items-center gap-2" style="flex-shrink:0">
+                    {% if user.avatar %}
+                    <img src="{{ user.avatar }}"
+                        style="width:30px;height:30px;border-radius:50%;border:2px solid var(--primary)" alt="">
+                    {% else %}
+                    <i class="bi bi-person-circle" style="color:var(--primary);font-size:1.1rem"></i>
+                    {% endif %}
+                    <span style="font-size:.82rem;font-weight:600;white-space:nowrap">{{ user.name or user.email
+                        }}</span>
+                    <a href="/auth/logout"
+                        style="font-size:.75rem;color:var(--muted);text-decoration:none;white-space:nowrap">
+                        <i class="bi bi-box-arrow-right me-1"></i>Sign out
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metric-row">
+            <div class="metric-tile t1">
+                <div class="metric-num" id="mDash">0</div>
+                <div class="metric-lbl">Dashboards</div>
+            </div>
+            <div class="metric-tile t2">
+                <div class="metric-num" id="mChart">0</div>
+                <div class="metric-lbl">Charts</div>
+            </div>
+            <div class="metric-tile t3">
+                <div class="metric-num" id="mTask">0</div>
+                <div class="metric-lbl">Jira Tasks</div>
+            </div>
+            <div class="metric-tile t4">
+                <div class="metric-num" id="mExport">0</div>
+                <div class="metric-lbl">Exports</div>
+            </div>
+        </div>
+
+        <div class="workspace-grid">
+            <div class="workspace-top">
+                <div class="card-white" id="intelligencePanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="bi bi-activity text-warning"></i> Decision Intelligence <span
+                                id="intelligenceAIBadge" class="ai-result-badge" style="display:none"><i
+                                    class="bi bi-robot"></i> AI</span></h5>
+                        <button class="btn btn-sm btn-outline-warning" onclick="loadProjectIntelligence()"><i
+                                class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    </div>
+                    <div id="intelligenceContent">
+                        <p class="text-muted mb-0">Loading project intelligence...</p>
+                    </div>
+                </div>
+
+                <!-- Prompt -->
+                <div class="card-white" id="promptPanel">
+                    <h5 class="mb-3"><i class="bi bi-chat-dots text-primary"></i> Describe Your Dashboard <span
+                            class="ai-result-badge"><i class="bi bi-robot"></i> AI</span></h5>
+                    <textarea id="promptInput" class="prompt-area" rows="3"
+                        placeholder="E.g. Create a pie chart showing {{ project_key }} sprint status, or List all issues in sprint 2..."></textarea>
+                    <div class="d-flex gap-3 mt-3 flex-wrap align-items-center">
+                        <button class="btn-gen" onclick="generateDashboard()"><i class="bi bi-magic"></i> Generate
+                            Dashboard</button>
+                        <button class="btn btn-outline-warning" id="updateBtn" onclick="updateDashboard()" disabled><i
+                                class="bi bi-pencil"></i> Update</button>
+                    </div>
+                    <div class="quick-row">
+                        <button class="qbtn pie"
+                            onclick="setPromptTemplate('Create a pie chart showing {project} issue status distribution')"><i
+                                class="bi bi-pie-chart"></i> Pie Chart</button>
+                        <button class="qbtn bar"
+                            onclick="setPromptTemplate('Generate a bar chart for {project} issues by assignee')"><i
+                                class="bi bi-bar-chart"></i> Bar Chart</button>
+                        <button class="qbtn metrics"
+                            onclick="setPromptTemplate('Show {project} project metrics dashboard')"><i
+                                class="bi bi-speedometer2"></i> Metrics</button>
+                        <button class="qbtn jira" onclick="setPromptTemplate('create a Gantt chart of {project}')"><i
+                                class="bi bi-journal-text"></i> Gantt chart</button>
+                    </div>
+                    <div class="eg-box">
+                        <h6 class="mb-2"><i class="bi bi-lightbulb text-warning"></i> Example Prompts:</h6>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="eg-item"
+                                    onclick="setPromptTemplate('Create a pie chart showing {project} issue status')"><i
+                                        class="bi bi-pie-chart text-primary"></i> Create a pie chart showing issue
+                                    status</div>
+                                <div class="eg-item" onclick="setPromptTemplate('List all sprints in {project}')"><i
+                                        class="bi bi-calendar3 text-info"></i> List all sprints</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="eg-item" onclick="setPromptTemplate('Who is working on what in {project}')">
+                                    <i class="bi bi-people text-success"></i> Who is working on what
+                                </div>
+                                <div class="eg-item"
+                                    onclick="setPromptTemplate('Create a bar chart for {project} and export to Excel')">
+                                    <i class="bi bi-file-earmark-excel text-success"></i> Bar chart and export to Excel
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-white" id="jiraPanel" style="display:none">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> Jira Tasks
+                        </h5>
+                        <button class="btn btn-sm btn-outline-info" onclick="loadJiraTasks()"><i
+                                class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    </div>
+                    <div id="jiraList">
+                        <p class="text-muted">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="executiveBoard" class="executive-board"></div>
+
+            <!-- Results area -->
+            <div id="resultsArea"></div>
+        </div>
+
+        <!-- Spinner -->
+        <div id="spinner">
+            <div class="spin-card">
+                <div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem"></div>
+                <div id="spinnerStep" style="font-size:1rem;font-weight:600;color:#4e73df;margin-bottom:6px">
+                    Processing...</div>
+                <div id="spinnerDetail" style="font-size:.83rem;color:#858796">Analysing your request</div>
+                <div class="progress mt-3" style="height:5px;border-radius:3px">
+                    <div id="spinnerProgress" class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                        style="width:10%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast"></div>
+        <div id="a11yLiveRegion" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Jira Task Modal -->
+        <div class="modal fade" id="jiraModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-journal-text"></i> Create Jira Task</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="modalDashId">
+                        <div class="mb-3"><label class="form-label fw-semibold">Summary</label><input type="text"
+                                class="form-control" id="modalSummary"></div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Description</label><textarea
+                                class="form-control" id="modalDesc" rows="3"></textarea></div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Priority</label>
+                            <select class="form-select" id="modalPriority">
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="submitJiraTask()"><i class="bi bi-check-lg"></i>
+                            Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Modal -->
+        <div class="modal fade" id="updateModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> Update Dashboard</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label fw-semibold">New Prompt</label>
+                        <textarea class="form-control" id="updatePrompt" rows="4"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="confirmUpdate()"><i class="bi bi-check-lg"></i>
+                            Update</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jira Task Edit Modal -->
+        <div class="modal fade" id="taskEditModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content" style="border-radius:14px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Jira Task</h5><button
+                            class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="taskEditId">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Summary</label>
+                            <input type="text" class="form-control" id="taskEditSummary">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Assigned To</label>
+                            <select class="form-select" id="taskEditAssignee"></select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Priority</label>
+                            <select class="form-select" id="taskEditPriority"></select>
+                        </div>
+
+                        <div class="mb-1">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" id="taskEditStatus"></select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveTaskEdit()"><i class="bi bi-check-lg"></i>
+                            Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            var currentDashId = null;
+            var dashboards = [];
+            var exportCount = 0;
+            var spinTimer = null;
+            var jiraTasksAll = [];
+            var jiraTaskPage = 0;
+            var jiraTaskPageSize = 5;
+            var recommendationPage = 0;
+            var recommendationPageSize = 5;
+            var taskEditModal = null;
+            var projectIntelligence = null;
+            var jiraReleases = [];
+            var densityMode = 'compact';
+            var darkMode = false;
+            var accessibilityMode = false;
+            var projectView = { key: '', name: '' };
+            var lastPromptRun = '';
+            var lastPromptOutcome = '';
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var projectSelect = document.getElementById('projectSwitcher');
+                if (projectSelect && projectSelect.value) {
+                    projectView.key = projectSelect.value.trim();
+                }
+                var projectNameEl = document.getElementById('projectNameText');
+                if (projectNameEl && projectNameEl.textContent) {
+                    projectView.name = projectNameEl.textContent.trim();
+                }
+                if (!projectView.name) projectView.name = projectView.key;
+                applyProjectView();
+                initDensityMode();
+                initDarkMode();
+                initAccessibilityMode();
+                loadMetrics();
+                loadDashboards();
+                loadProjectIntelligence();
+                loadJiraTasks();
+                loadProjectOptions();
+                syncProjectBoundUi();
+            });
+
+            function applyProjectView() {
+                var nameText = document.getElementById('projectNameText');
+                if (nameText) nameText.textContent = projectView.name || projectView.key || 'Project';
+            }
+
+            function initDensityMode() {
+                try {
+                    var saved = localStorage.getItem('dashboard_density_mode');
+                    var mode = (saved === 'compact' || saved === 'executive') ? saved : 'compact';
+                    setDensityMode(mode, true);
+                } catch (e) {
+                    setDensityMode('compact', true);
+                }
+            }
+
+            function initDarkMode() {
+                try {
+                    var saved = localStorage.getItem('dashboard_dark_mode');
+                    var isDark = saved === 'true';
+                    setDarkMode(isDark, true);
+                } catch (e) {
+                    setDarkMode(false, true);
+                }
+            }
+
+            function initAccessibilityMode() {
+                try {
+                    var saved = localStorage.getItem('dashboard_accessibility_mode');
+                    var isEnabled = saved === 'true';
+                    setAccessibilityMode(isEnabled, true);
+                } catch (e) {
+                    setAccessibilityMode(false, true);
+                }
+            }
+
+            function toggleDarkMode() {
+                setDarkMode(!darkMode);
+            }
+
+            function toggleAccessibilityMode() {
+                setAccessibilityMode(!accessibilityMode);
+            }
+
+            function setDarkMode(enabled, skipPersist) {
+                darkMode = !!enabled;
+                var toggle = document.getElementById('darkModeToggle');
+
+                if (darkMode) {
+                    document.body.classList.add('dark-mode');
+                    if (toggle) {
+                        toggle.classList.add('active');
+                        toggle.innerHTML = '<i class="bi bi-sun"></i>';
+                        toggle.title = 'Switch to light mode';
+                        toggle.setAttribute('aria-pressed', 'true');
+                    }
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    if (toggle) {
+                        toggle.classList.remove('active');
+                        toggle.innerHTML = '<i class="bi bi-moon-stars"></i>';
+                        toggle.title = 'Switch to dark mode';
+                        toggle.setAttribute('aria-pressed', 'false');
+                    }
+                }
+
+                if (!skipPersist) {
+                    try {
+                        localStorage.setItem('dashboard_dark_mode', darkMode ? 'true' : 'false');
+                    } catch (e) {
+                        // Ignore storage errors
+                    }
+                }
+            }
+
+            function setAccessibilityMode(enabled, skipPersist) {
+                accessibilityMode = !!enabled;
+                var toggle = document.getElementById('accessibilityToggle');
+
+                if (accessibilityMode) {
+                    document.body.classList.add('accessibility-mode');
+                    if (toggle) {
+                        toggle.classList.add('active');
+                        toggle.title = 'Disable accessibility mode';
+                        toggle.setAttribute('aria-pressed', 'true');
+                    }
+                    announceForA11y('Accessibility mode enabled. High contrast, larger text and stronger focus indicators are active.');
+                } else {
+                    document.body.classList.remove('accessibility-mode');
+                    if (toggle) {
+                        toggle.classList.remove('active');
+                        toggle.title = 'Enable accessibility mode';
+                        toggle.setAttribute('aria-pressed', 'false');
+                    }
+                    announceForA11y('Accessibility mode disabled.');
+                }
+
+                if (!skipPersist) {
+                    try {
+                        localStorage.setItem('dashboard_accessibility_mode', accessibilityMode ? 'true' : 'false');
+                    } catch (e) {
+                        // Ignore storage errors
+                    }
+                }
+            }
+
+            function setDensityMode(mode, skipPersist) {
+                var safeMode = (mode === 'compact' || mode === 'executive') ? mode : 'compact';
+                densityMode = safeMode;
+                document.body.classList.remove('density-compact', 'density-executive');
+                if (safeMode === 'compact') document.body.classList.add('density-compact');
+                if (safeMode === 'executive') document.body.classList.add('density-executive');
+
+                document.querySelectorAll('.view-mode-btn').forEach(function (btn) {
+                    var active = btn.getAttribute('data-mode') === safeMode;
+                    btn.classList.toggle('active', active);
+                    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+
+                if (!skipPersist) {
+                    try {
+                        localStorage.setItem('dashboard_density_mode', safeMode);
+                    } catch (e) {
+                        // Ignore storage errors in strict browser modes.
+                    }
+                }
+
+                renderExecutiveBoard();
+            }
+
+            async function loadProjectOptions() {
+                var sel = document.getElementById('projectSwitcher');
+                if (!sel) return;
+                try {
+                    var d = await api('/api/jira/projects');
+                    var projects = d.projects || [];
+                    var currentKey = '';
+
+                    try {
+                        var auth = await api('/auth/status');
+                        currentKey = (auth.project_key || '').trim();
+                    } catch (authErr) {
+                        currentKey = '';
+                    }
+
+                    if (!projects.length) {
+                        sel.innerHTML = '<option value="">No projects</option>';
+                        sel.disabled = true;
+                        return;
+                    }
+
+                    sel.innerHTML = projects.map(function (p) {
+                        var selected = (p.key || '').toUpperCase() === currentKey.toUpperCase() ? ' selected' : '';
+                        var label = p.key + (p.name ? (' — ' + p.name) : '');
+                        return '<option value="' + p.key + '"' + selected + '>' + label + '</option>';
+                    }).join('');
+                    sel.disabled = false;
+                    loadJiraReleases();
+                } catch (e) {
+                    console.warn('Project list:', e.message);
+                    loadJiraReleases();
+                }
+            }
+
+            async function switchProject(projectKey) {
+                if (!projectKey) return;
+
+                var sel = document.getElementById('projectSwitcher');
+
+                try {
+                    if (sel) sel.disabled = true;
+                    var res = await api('/api/project/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_key: projectKey })
+                    });
+
+                    var selectedName = '';
+                    if (sel && sel.options && sel.selectedIndex >= 0) {
+                        var selectedText = sel.options[sel.selectedIndex].text || '';
+                        selectedName = selectedText.split(' — ').slice(1).join(' — ').trim();
+                    }
+                    projectView.key = (res.project_key || projectKey || '').trim();
+                    projectView.name = (res.project_name || selectedName || projectView.key || '').trim();
+                    applyProjectView();
+                    syncProjectBoundUi();
+
+                    toast('Switched to ' + (res.project_key || projectKey), 'success');
+                    dashboards = [];
+                    renderDashboards();
+                    await loadProjectIntelligence();
+                    await loadJiraTasks();
+                    await loadJiraReleases();
+                    await loadMetrics();
+                } catch (e) {
+                    toast('Project switch failed: ' + e.message, 'danger');
+                } finally {
+                    if (sel) sel.disabled = false;
+                }
+            }
+
+            async function api(url, opts) {
+                var res = await fetch(url, opts || {});
+                if (res.status === 401) { window.location.href = '/login'; return; }
+
+                var contentType = (res.headers.get('content-type') || '').toLowerCase();
+                var rawText = await res.text();
+                var data = {};
+
+                if (rawText) {
+                    if (contentType.includes('application/json')) {
+                        try {
+                            data = JSON.parse(rawText);
+                        } catch (e) {
+                            // Fall back to raw text when backend sends malformed JSON.
+                            data = { error: rawText };
+                        }
+                    } else {
+                        var looksLikeHtml = rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html');
+                        data = { error: looksLikeHtml ? ('HTTP ' + res.status) : rawText };
+                    }
+                }
+
+                if (!res.ok) {
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }
+
+                return data;
+            }
+
+            function toast(msg, type) {
+                var el = document.getElementById('toast');
+                el.textContent = msg; el.className = type || 'info'; el.style.display = 'block';
+                announceForA11y(msg);
+                clearTimeout(window._toastTimer);
+                window._toastTimer = setTimeout(function () { el.style.display = 'none'; }, 5000);
+            }
+
+            function announceForA11y(message) {
+                var liveRegion = document.getElementById('a11yLiveRegion');
+                if (!liveRegion || !message) return;
+                liveRegion.textContent = '';
+                setTimeout(function () {
+                    liveRegion.textContent = String(message);
+                }, 30);
+            }
+
+            function spin(on) {
+                var el = document.getElementById('spinner');
+                if (on) { el.classList.add('on'); runSpinSteps(); }
+                else {
+                    el.classList.remove('on'); clearTimeout(spinTimer);
+                    document.getElementById('spinnerStep').textContent = 'Processing...';
+                    document.getElementById('spinnerDetail').textContent = 'Analysing your request';
+                    document.getElementById('spinnerProgress').style.width = '10%';
+                }
+            }
+
+            function runSpinSteps() {
+                var steps = [
+                    { pct: '15%', title: 'Analysing prompt...', detail: 'Understanding your request' },
+                    { pct: '30%', title: 'Connecting to Jira...', detail: 'Using your OAuth token' },
+                    { pct: '50%', title: 'Fetching Jira data...', detail: 'Calling MCP tools' },
+                    { pct: '70%', title: 'Processing results...', detail: 'Preparing chart data' },
+                    { pct: '85%', title: 'Generating chart...', detail: 'Rendering visualisation' },
+                    { pct: '95%', title: 'Almost done...', detail: 'Formatting response' },
+                ];
+                var i = 0;
+                function next() {
+                    if (i >= steps.length) return;
+                    var s = steps[i++];
+                    document.getElementById('spinnerStep').textContent = s.title;
+                    document.getElementById('spinnerDetail').textContent = s.detail;
+                    document.getElementById('spinnerProgress').style.width = s.pct;
+                    spinTimer = setTimeout(next, 1400);
+                }
+                next();
+            }
+
+            function getCurrentProjectKey() {
+                var sel = document.getElementById('projectSwitcher');
+                if (sel && sel.value) return sel.value.trim();
+                return (projectView.key || '').trim();
+            }
+
+            function syncProjectBoundUi() {
+                var key = getCurrentProjectKey();
+                if (!key) return;
+
+                var promptInput = document.getElementById('promptInput');
+                if (promptInput) {
+                    promptInput.placeholder = 'E.g. Create a pie chart showing ' + key + ' sprint status, or List all issues in sprint 2...';
+                }
+            }
+
+            function setPrompt(text) { document.getElementById('promptInput').value = text; }
+
+            function setPromptTemplate(template) {
+                var key = getCurrentProjectKey();
+                setPrompt((template || '').split('{project}').join(key));
+            }
+
+            async function loadMetrics() {
+                try {
+                    var d = await api('/api/metrics');
+                    document.getElementById('mDash').textContent = d.total_dashboards;
+                    var tot = 0; Object.values(d.chart_types).forEach(function (v) { tot += v; });
+                    document.getElementById('mChart').textContent = tot;
+                    renderExecutiveBoard();
+                } catch (e) { console.warn('Metrics:', e.message); }
+            }
+
+            async function loadDashboards() {
+                try {
+                    var d = await api('/api/dashboards');
+                    dashboards = d.dashboards || [];
+                    renderDashboards();
+                    renderExecutiveBoard();
+                } catch (e) { console.warn('Dashboards:', e.message); }
+            }
+
+            async function loadProjectIntelligence() {
+                var container = document.getElementById('intelligenceContent');
+                if (!container) return;
+                container.innerHTML = '<p class="text-muted mb-0"><span class="spinner-border spinner-border-sm"></span> Loading project intelligence...</p>';
+                try {
+                    projectIntelligence = await api('/api/project/intelligence');
+                    recommendationPage = 0;
+                    renderProjectIntelligence();
+                    renderExecutiveBoard();
+                } catch (e) {
+                    container.innerHTML = '<div class="alert alert-warning small mb-0">' + e.message + '</div>';
+                    renderExecutiveBoard();
+                }
+            }
+
+            async function getSelectedProjectKeyForApi() {
+                var sel = document.getElementById('projectSwitcher');
+                if (sel && sel.value) return sel.value.trim();
+
+                try {
+                    var auth = await api('/auth/status');
+                    return (auth.project_key || '').trim();
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            async function loadJiraReleases() {
+                try {
+                    var projectKey = await getSelectedProjectKeyForApi();
+                    var url = '/api/jira/releases';
+                    if (projectKey) {
+                        url += '?project_key=' + encodeURIComponent(projectKey);
+                    }
+                    var d = await api(url);
+                    jiraReleases = d.releases || [];
+                    renderExecutiveBoard();
+                } catch (e) {
+                    jiraReleases = [];
+                    console.warn('Releases:', e.message);
+                    renderExecutiveBoard();
+                }
+            }
+
+            function escapeHtml(text) {
+                return String(text == null ? '' : text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function summarizeCounts(items, keyFn) {
+                return (items || []).reduce(function (acc, item) {
+                    var key = keyFn(item);
+                    var safeKey = key ? String(key).trim() : 'Unknown';
+                    acc[safeKey] = (acc[safeKey] || 0) + 1;
+                    return acc;
+                }, {});
+            }
+
+            function toTopList(countMap, limit) {
+                return Object.keys(countMap || {})
+                    .map(function (key) { return { key: key, count: countMap[key] }; })
+                    .sort(function (a, b) { return b.count - a.count; })
+                    .slice(0, limit || 5);
+            }
+
+            function renderExecutiveBoard() {
+                var board = document.getElementById('executiveBoard');
+                if (!board) return;
+
+                if (densityMode !== 'executive') {
+                    board.innerHTML = '';
+                    return;
+                }
+
+                var indicators = (projectIntelligence && projectIntelligence.indicators) ? projectIntelligence.indicators : {};
+                var forecast = (projectIntelligence && projectIntelligence.forecast) ? projectIntelligence.forecast : {};
+                var recommendations = (projectIntelligence && projectIntelligence.recommendations) ? projectIntelligence.recommendations : [];
+                var highlights = (projectIntelligence && projectIntelligence.highlights) ? projectIntelligence.highlights : [];
+                var tasks = jiraTasksAll || [];
+                var aiBadge = '<span class="ai-result-badge"><i class="bi bi-robot"></i> AI</span>';
+                var intelligenceFromAI = !!(projectIntelligence && String(projectIntelligence.analysis_source || '').toLowerCase() === 'llm');
+                var intelligenceAIBadge = intelligenceFromAI ? aiBadge : '';
+
+                var statusTop = toTopList(summarizeCounts(tasks, function (t) { return t.status || 'Unknown'; }), 5);
+                var priorityTop = toTopList(summarizeCounts(tasks, function (t) { return t.priority || 'Unknown'; }), 5);
+                var assigneeTop = toTopList(summarizeCounts(tasks, function (t) { return t.assignee || 'Unassigned'; }), 6);
+                var capacityPerAssignee = 6;
+
+                var dashCount = document.getElementById('mDash') ? document.getElementById('mDash').textContent : '0';
+                var chartCount = document.getElementById('mChart') ? document.getElementById('mChart').textContent : '0';
+                var taskCount = document.getElementById('mTask') ? document.getElementById('mTask').textContent : String(tasks.length || 0);
+                var exportCountText = document.getElementById('mExport') ? document.getElementById('mExport').textContent : '0';
+
+                var topDashboards = (dashboards || []).slice(0, 4);
+                var dashboardRows = topDashboards.map(function (dash) {
+                    var cfg = dash.dashboard_config || dash.chart_config || {};
+                    var title = cfg.title || 'Dashboard';
+                    return '<li><strong>' + escapeHtml(title) + '</strong><br><span class="text-muted">' +
+                        escapeHtml(new Date(dash.created_at).toLocaleString()) + '</span></li>';
+                }).join('');
+                if (!dashboardRows) {
+                    dashboardRows = '<li>No dashboards created yet.</li>';
+                }
+
+                var recommendationRows = recommendations.slice(0, 6).map(function (r) {
+                    return '<tr><td><strong>' + escapeHtml(r.title || 'Action') + '</strong></td><td>' + escapeHtml(r.impact || '—') + '</td></tr>';
+                }).join('');
+                if (!recommendationRows) {
+                    recommendationRows = '<tr><td colspan="2" class="text-muted">No recommendations yet.</td></tr>';
+                }
+
+                var highlightRows = highlights.slice(0, 6).map(function (h) {
+                    return '<li>' + escapeHtml(h) + '</li>';
+                }).join('');
+                if (!highlightRows) {
+                    highlightRows = '<li>No highlights available.</li>';
+                }
+
+                var statusRows = statusTop.map(function (s) {
+                    return '<li><strong>' + escapeHtml(s.key) + ':</strong> ' + s.count + '</li>';
+                }).join('');
+                if (!statusRows) statusRows = '<li>No status data.</li>';
+
+                var priorityRows = priorityTop.map(function (p) {
+                    return '<li><strong>' + escapeHtml(p.key) + ':</strong> ' + p.count + '</li>';
+                }).join('');
+                if (!priorityRows) priorityRows = '<li>No priority data.</li>';
+
+                var assigneeRows = assigneeTop.map(function (a) {
+                    return '<li><strong>' + escapeHtml(a.key) + ':</strong> ' + a.count + '</li>';
+                }).join('');
+                if (!assigneeRows) assigneeRows = '<li>No assignee data.</li>';
+
+                var activeAssignees = assigneeTop
+                    .filter(function (a) {
+                        return String(a.key || '').trim().toLowerCase() !== 'unassigned';
+                    })
+                    .slice()
+                    .sort(function (a, b) { return a.count - b.count; });
+
+                var unassignedTasks = tasks.filter(function (t) {
+                    var assignee = String((t && t.assignee) || '').trim().toLowerCase();
+                    return !assignee || assignee === 'unassigned';
+                });
+
+                var assignmentSuggestions = (projectIntelligence && Array.isArray(projectIntelligence.assignment_suggestions))
+                    ? projectIntelligence.assignment_suggestions
+                    : [];
+                var assignmentSuggestionsFromAI = !!(projectIntelligence && String(projectIntelligence.assignment_suggestions_source || '').toLowerCase() === 'llm');
+
+                var resourceSuggestionRows = '';
+                if (assignmentSuggestions.length) {
+                    resourceSuggestionRows = assignmentSuggestions.slice(0, 8).map(function (s) {
+                        var ticketLabel = s.key ? escapeHtml(s.key) : 'Unassigned ticket';
+                        var issueMatch = unassignedTasks.find(function (t) { return String(t.task_id || '').trim() === String(s.key || '').trim(); });
+                        var summaryLabel = issueMatch && issueMatch.summary ? escapeHtml(issueMatch.summary) : 'No summary available';
+                        var primaryLabel = s.primary ? escapeHtml(s.primary) : 'N/A';
+                        var backupLabel = s.backup ? escapeHtml(s.backup) : 'N/A';
+                        var reasonLabel = s.reason ? '<br><span class="text-muted">Why: ' + escapeHtml(s.reason) + '</span>' : '';
+                        return '<li><strong>' + ticketLabel + ':</strong> ' + summaryLabel + '<br><span class="text-muted">Primary: ' + primaryLabel + ' · Backup: ' + backupLabel + '</span>' + reasonLabel + '</li>';
+                    }).join('');
+                } else if (!unassignedTasks.length) {
+                    resourceSuggestionRows = '<li>No unassigned tickets right now.</li>';
+                } else if (!activeAssignees.length) {
+                    resourceSuggestionRows = '<li>Assignee roster is unavailable. Add assigned tickets to enable suggestions.</li>';
+                } else {
+                    resourceSuggestionRows = unassignedTasks.slice(0, 6).map(function (t, idx) {
+                        var primary = activeAssignees[idx % activeAssignees.length];
+                        var backup = activeAssignees.length > 1 ? activeAssignees[(idx + 1) % activeAssignees.length] : null;
+                        var ticketLabel = t.task_id ? escapeHtml(t.task_id) : 'Unassigned ticket';
+                        var summaryLabel = t.summary ? escapeHtml(t.summary) : 'No summary available';
+                        var primaryLabel = primary ? (escapeHtml(primary.key) + ' (' + primary.count + ')') : 'N/A';
+                        var backupLabel = backup ? (escapeHtml(backup.key) + ' (' + backup.count + ')') : 'N/A';
+                        return '<li><strong>' + ticketLabel + ':</strong> ' + summaryLabel + '<br><span class="text-muted">Primary: ' + primaryLabel + ' · Backup: ' + backupLabel + '</span></li>';
+                    }).join('');
+                }
+
+                var utilizationData = activeAssignees.map(function (a) {
+                    var pct = capacityPerAssignee > 0 ? Math.min(100, Math.round((a.count / capacityPerAssignee) * 100)) : 0;
+                    var band = pct >= 85 ? 'high' : (pct >= 50 ? 'medium' : 'low');
+                    return {
+                        name: a.key,
+                        count: a.count,
+                        percent: pct,
+                        band: band,
+                    };
+                });
+
+                var avgUtilization = 0;
+                if (utilizationData.length) {
+                    avgUtilization = Math.round(
+                        utilizationData.reduce(function (sum, item) { return sum + item.percent; }, 0) / utilizationData.length
+                    );
+                }
+
+                var utilizationRows = utilizationData.map(function (u) {
+                    return '<div class="exec-util-row">' +
+                        '<div class="exec-util-name" title="' + escapeHtml(u.name) + '">' + escapeHtml(u.name) + '</div>' +
+                        '<div class="exec-util-track">' +
+                        '<div class="exec-util-fill ' + u.band + '" style="width:' + u.percent + '%"></div>' +
+                        '</div>' +
+                        '<div class="exec-util-pct">' + u.percent + '%</div>' +
+                        '</div>';
+                }).join('');
+                if (!utilizationRows) {
+                    utilizationRows = '<div class="text-muted" style="font-size:.8rem">No utilization data available.</div>';
+                }
+
+                var remainingTasks = indicators.open_issues || 0;
+                var projectedEndDate = 'Not enough data';
+                var daysToClear = Number(forecast.estimated_days_to_clear);
+                if (!isNaN(daysToClear) && daysToClear > 0) {
+                    var projectedDate = new Date(Date.now() + (daysToClear * 24 * 60 * 60 * 1000));
+                    projectedEndDate = projectedDate.toLocaleDateString();
+                }
+                var releaseRows = jiraReleases.slice(0, 5).map(function (release) {
+                    var progressText = release.issues_total > 0
+                        ? (release.issues_fixed + '/' + release.issues_total + ' issues')
+                        : 'No work items';
+                    var releaseDateText = release.release_date || 'TBD';
+                    return '<li><strong>' + escapeHtml(release.name || 'Release') + '</strong><br>' +
+                        '<span class="text-muted">' + escapeHtml(release.status || 'Unreleased') + ' · ' + escapeHtml(releaseDateText) + '</span><br>' +
+                        '<span class="text-muted">Progress: ' + escapeHtml(progressText) + ' · ' + escapeHtml(String(release.progress_percent || 0)) + '%</span></li>';
+                }).join('');
+                if (!releaseRows) {
+                    releaseRows = '<li>No Jira releases available.</li>';
+                }
+
+                var projectKeyBadge = '';
+                projectKeyBadge = getCurrentProjectKey();
+                if (!projectKeyBadge) projectKeyBadge = 'project';
+
+                var topStatus = statusTop.length ? statusTop[0].key : 'In Progress';
+                var topPriority = priorityTop.length ? priorityTop[0].key : 'High';
+                var topAssignee = assigneeTop.length ? assigneeTop[0].key : 'team';
+
+                var dynamicPromptIdeas = [
+                    'Show blockers by assignee for ' + projectKeyBadge + ' with recommended owners for each blocker',
+                    'Give a burndown outlook for ' + projectKeyBadge + ' and flag what keeps tasks in ' + topStatus,
+                    'Create a risk matrix for ' + projectKeyBadge + ' by priority and status, highlight ' + topPriority + ' tickets',
+                    'Suggest sprint balancing moves for ' + projectKeyBadge + ' so ' + topAssignee + ' has sustainable load'
+                ];
+
+                var promptIdeaRows = dynamicPromptIdeas.map(function (idea) {
+                    return '<li>' + escapeHtml(idea) + '</li>';
+                }).join('');
+
+                var promptRunHtml =
+                    '<div class="exec-widget exec-prompt-widget">' +
+                    '<h6><i class="bi bi-lightbulb text-warning"></i> Latest Prompt Run' + aiBadge + '</h6>' +
+                    '<div class="exec-mini-list">' +
+                    '<li><strong>Prompt:</strong> ' + escapeHtml(lastPromptRun || 'No prompt executed yet.') + '</li>' +
+                    '<li><strong>Generated text:</strong> <span class="exec-compact-text">' + escapeHtml(lastPromptOutcome || 'Waiting for first run') + '</span></li>' +
+                    '</div>' +
+                    '</div>';
+
+                board.innerHTML =
+                    '<div class="exec-board-wrap">' +
+                    '<div class="exec-board-title"><i class="bi bi-grid-1x2-fill"></i> Executive Portfolio View</div>' +
+                    '<div class="exec-grid">' +
+                    promptRunHtml +
+                    '<div class="exec-widget exec-prompt-ideas">' +
+                    '<h6><i class="bi bi-stars text-info"></i> Dynamic Prompt Ideas</h6>' +
+                    '<ul class="exec-mini-list">' + promptIdeaRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-heart-pulse text-success"></i> Delivery Health' + intelligenceAIBadge + '</h6>' +
+                    '<div class="exec-two-col">' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(projectIntelligence ? projectIntelligence.health_score : 0) + '</strong>Health score</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(projectIntelligence ? (projectIntelligence.risk_level || 'Low') : 'Low') + '</strong>Risk level</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(indicators.open_issues || 0) + '</strong>Open issues</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(indicators.blocked_issues || 0) + '</strong>Blockers</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(remainingTasks) + '</strong>Remaining tasks</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(forecast.completion_rate || 0) + '%</strong>14-day flow</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(projectedEndDate) + '</strong>Scheduled end date</div>' +
+                    '<div class="exec-datum"><strong>' + escapeHtml(projectIntelligence ? (projectIntelligence.health_label || 'Watch') : 'Watch') + '</strong>Signal</div>' +
+                    '<div class="exec-datum"><strong>' + avgUtilization + '%</strong>Team utilization</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-grid-3x3-gap text-primary"></i> Delivery Mix</h6>' +
+                    '<div class="exec-mix-grid">' +
+                    '<div class="exec-mix-col">' +
+                    '<div class="exec-mix-title">Jira Status Mix</div>' +
+                    '<ul class="exec-mini-list">' + statusRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-mix-col">' +
+                    '<div class="exec-mix-title">Priority Mix</div>' +
+                    '<ul class="exec-mini-list">' + priorityRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-mix-col">' +
+                    '<div class="exec-mix-title">Ownership Snapshot</div>' +
+                    '<ul class="exec-mini-list">' + assigneeRows + '</ul>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-speedometer2 text-danger"></i> Resource Utilization</h6>' +
+                    utilizationRows +
+                    '<div class="text-muted" style="font-size:.72rem;margin-top:6px">Unassigned tickets: ' + unassignedTasks.length + '</div>' +
+                    '<div class="text-muted" style="font-size:.72rem;margin-top:8px">Capacity baseline: ' + capacityPerAssignee + ' active tasks per person</div>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-person-check text-primary"></i> Unassigned Ticket Suggestions' + (assignmentSuggestionsFromAI ? aiBadge : '') + '</h6>' +
+                    '<ul class="exec-mini-list">' + resourceSuggestionRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-lightning-charge text-warning"></i> Key Highlights' + intelligenceAIBadge + '</h6>' +
+                    '<ul class="exec-mini-list">' + highlightRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-compass text-danger"></i> Recommended Actions' + intelligenceAIBadge + '</h6>' +
+                    '<table class="exec-table"><tbody>' + recommendationRows + '</tbody></table>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-kanban text-success"></i> Recent Dashboards</h6>' +
+                    '<ul class="exec-mini-list">' + dashboardRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-widget">' +
+                    '<h6><i class="bi bi-graph-up-arrow text-success"></i> Forecast' + intelligenceAIBadge + '</h6>' +
+                    '<ul class="exec-mini-list" style="margin-bottom:10px">' +
+                    '<li><strong>Delivery trend:</strong> ' + escapeHtml(forecast.summary || 'No forecast available yet.') + '</li>' +
+                    '<li><strong>Completion rate:</strong> ' + escapeHtml(forecast.completion_rate || 0) + '%</li>' +
+                    '<li><strong>Task throughput:</strong> ' + escapeHtml(tasks.length) + ' active tracked tasks</li>' +
+                    '</ul>' +
+                    '<div style="position:relative;height:140px;width:100%"><canvas id="execVelocityChart"></canvas></div>' +
+                    '</div>' +
+                    '<div class="exec-widget exec-releases-widget">' +
+                    '<h6><i class="bi bi-box-seam text-info"></i> Releases</h6>' +
+                    '<ul class="exec-mini-list">' + releaseRows + '</ul>' +
+                    '</div>' +
+                    '<div class="exec-widget exec-focus-widget">' +
+                    '<h6><i class="bi bi-journal-text text-primary"></i> Current Jira Focus</h6>' +
+                    '<table class="exec-table"><tbody>' +
+                    (tasks.slice(0, 8).map(function (t) {
+                        return '<tr><td style="width:84px"><a href="' + escapeHtml(t.url || '#') + '" target="_blank" class="jira-key">' + escapeHtml(t.task_id || '—') + '</a></td>' +
+                            '<td>' + escapeHtml(t.summary || '') + '</td>' +
+                            '<td style="width:90px">' + escapeHtml(t.status || '—') + '</td></tr>';
+                    }).join('') || '<tr><td colspan="3" class="text-muted">No Jira tasks found.</td></tr>') +
+                    '</tbody></table>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+
+                // Render sprint velocity chart inside Forecast widget
+                var velocityData = (projectIntelligence && Array.isArray(projectIntelligence.sprint_velocity))
+                    ? projectIntelligence.sprint_velocity : [];
+                var vcCanvas = document.getElementById('execVelocityChart');
+                if (vcCanvas && velocityData.length > 0) {
+                    if (window._execVelocityChartInstance) {
+                        window._execVelocityChartInstance.destroy();
+                    }
+                    window._execVelocityChartInstance = new Chart(vcCanvas.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: velocityData.map(function (d) { return d.sprint; }),
+                            datasets: [
+                                {
+                                    label: 'Committed',
+                                    data: velocityData.map(function (d) { return d.committed; }),
+                                    backgroundColor: 'rgba(47,128,237,0.25)',
+                                    borderColor: '#2f80ed',
+                                    borderWidth: 1.5,
+                                    borderRadius: 3,
+                                },
+                                {
+                                    label: 'Completed',
+                                    data: velocityData.map(function (d) { return d.completed; }),
+                                    backgroundColor: 'rgba(46,175,116,0.7)',
+                                    borderColor: '#2eaf74',
+                                    borderWidth: 1.5,
+                                    borderRadius: 3,
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                                tooltip: { callbacks: { title: function (items) { return 'Sprint: ' + items[0].label; } } }
+                            },
+                            scales: {
+                                x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+                                y: { beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                            }
+                        }
+                    });
+                } else if (vcCanvas && velocityData.length === 0) {
+                    vcCanvas.parentElement.innerHTML = '<p style="font-size:12px;color:#888;text-align:center;padding:20px 0">No sprint data available yet</p>';
+                }
+            }
+
+            function renderProjectIntelligence() {
+                var container = document.getElementById('intelligenceContent');
+                if (!container || !projectIntelligence) return;
+                var intelligenceAIBadge = document.getElementById('intelligenceAIBadge');
+                if (intelligenceAIBadge) {
+                    intelligenceAIBadge.style.display = String(projectIntelligence.analysis_source || '').toLowerCase() === 'llm' ? 'inline-flex' : 'none';
+                }
+
+                var indicators = projectIntelligence.indicators || {};
+                var forecast = projectIntelligence.forecast || {};
+                var highlights = projectIntelligence.highlights || [];
+                var recommendations = projectIntelligence.recommendations || [];
+                var riskClass = 'risk-' + String(projectIntelligence.risk_level || 'low').toLowerCase();
+                var totalRecommendations = recommendations.length;
+                var totalRecommendationPages = Math.max(1, Math.ceil(totalRecommendations / recommendationPageSize));
+                if (recommendationPage >= totalRecommendationPages) recommendationPage = totalRecommendationPages - 1;
+                var recStart = recommendationPage * recommendationPageSize;
+                var recEnd = Math.min(recStart + recommendationPageSize, totalRecommendations);
+                var visibleRecommendations = recommendations.slice(recStart, recEnd);
+
+                var highlightHtml = highlights.map(function (item) {
+                    return '<span class="intel-highlight"><i class="bi bi-lightning-charge"></i>' + item + '</span>';
+                }).join('');
+
+                var recommendationHtml = visibleRecommendations.map(function (item) {
+                    return '<div class="intel-item">' +
+                        '<strong>' + (item.title || 'Recommended action') + '</strong>' +
+                        '<p>' + (item.reason || '') + '</p>' +
+                        '<p style="margin-top:4px"><span class="badge bg-light text-dark">Impact</span> ' + (item.impact || '') + '</p>' +
+                        '</div>';
+                }).join('');
+
+                if (!recommendationHtml) {
+                    recommendationHtml = '<div class="intel-item"><strong>No recommendations</strong><p>No actions were suggested for this project yet.</p></div>';
+                }
+
+                var recommendationPagerHtml = '';
+                if (totalRecommendations > recommendationPageSize) {
+                    recommendationPagerHtml =
+                        '<div class="jira-pager">' +
+                        '<div class="jira-pager-info">Showing ' + (recStart + 1) + '–' + recEnd + ' of ' + totalRecommendations + '</div>' +
+                        '<div class="jira-pager-controls">' +
+                        '<button class="jira-pager-btn" onclick="changeRecommendationPage(-1)" ' + (recommendationPage === 0 ? 'disabled' : '') + '>' +
+                        '<i class="bi bi-chevron-left"></i>' +
+                        '</button>' +
+                        '<button class="jira-pager-btn" onclick="changeRecommendationPage(1)" ' + (recommendationPage >= totalRecommendationPages - 1 ? 'disabled' : '') + '>' +
+                        '<i class="bi bi-chevron-right"></i>' +
+                        '</button>' +
+                        '</div>' +
+                        '</div>';
+                }
+
+                container.innerHTML =
+                    '<div class="intel-hero">' +
+                    '<div class="intel-score ' + riskClass + '">' +
+                    '<div class="intel-score-value">' + (projectIntelligence.health_score || 0) + '</div>' +
+                    '<div class="intel-score-label">Health</div>' +
+                    '</div>' +
+                    '<div>' +
+                    '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">' +
+                    '<strong style="font-size:1rem">' + (projectIntelligence.health_label || 'Watch') + '</strong>' +
+                    '<span class="badge bg-' + riskBadgeClass(projectIntelligence.risk_level) + '">' + (projectIntelligence.risk_level || 'Low') + ' Risk</span>' +
+                    '</div>' +
+                    '<div class="intel-summary">' + (forecast.summary || 'No forecast available yet.') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="intel-strip">' +
+                    '<div class="intel-pill"><strong>' + (indicators.open_issues || 0) + '</strong><span>Open Issues</span></div>' +
+                    '<div class="intel-pill"><strong>' + (indicators.blocked_issues || 0) + '</strong><span>Blockers</span></div>' +
+                    '<div class="intel-pill"><strong>' + (forecast.completion_rate || 0) + '%</strong><span>14d Flow</span></div>' +
+                    '</div>' +
+                    '<div class="intel-section-title">Project Highlights</div>' +
+                    '<div style="margin-bottom:10px">' + highlightHtml + '</div>' +
+                    '<div class="intel-section-title">Recommended Actions</div>' +
+                    '<div class="intel-list">' + recommendationHtml + '</div>' +
+                    recommendationPagerHtml;
+            }
+
+            function changeRecommendationPage(delta) {
+                var recommendations = (projectIntelligence && projectIntelligence.recommendations) ? projectIntelligence.recommendations : [];
+                var totalPages = Math.max(1, Math.ceil(recommendations.length / recommendationPageSize));
+                var next = recommendationPage + delta;
+                if (next < 0 || next >= totalPages) return;
+                recommendationPage = next;
+                renderProjectIntelligence();
+            }
+
+            function renderDashboards() {
+                var area = document.getElementById('resultsArea');
+                area.querySelectorAll('.dash-card').forEach(function (el) { el.remove(); });
+                if (!dashboards.length) {
+                    if (!area.querySelector('.q-card')) {
+                        area.innerHTML = '<div class="card-white text-center py-5"><i class="bi bi-graph-up" style="font-size:3.5rem;color:#e3e6f0"></i><h5 class="mt-3 text-muted">No dashboards yet</h5><p class="text-muted">Use the prompt above to create your first dashboard!</p></div>';
+                    }
+                    return;
+                }
+                var ph = area.querySelector('.card-white.text-center');
+                if (ph) ph.remove();
+
+                dashboards.forEach(function (dash) {
+                    var cfg = dash.chart_config || {};
+                    var dashboardCfg = dash.dashboard_config || null;
+                    var jiraHtml = dash.jira_task
+                        ? '<li><strong>Jira:</strong> <a href="' + (dash.jira_task.url || '#') + '" target="_blank" style="color:var(--info)">' + dash.jira_task.task_id + '</a></li>'
+                        : '';
+                    var srcType = (dashboardCfg && dashboardCfg.data_source) || cfg.data_source;
+                    var srcBadge = srcType === 'jira_mcp'
+                        ? '<span class="badge bg-success ms-2" style="font-size:.7rem">Live Jira</span>'
+                        : '<span class="badge bg-secondary ms-2" style="font-size:.7rem">Sample</span>';
+                    if (srcType === 'llm_generated') {
+                        srcBadge += '<span class="ai-result-badge ms-2"><i class="bi bi-robot"></i> AI</span>';
+                    }
+
+                    var visualHtml = '';
+                    if (dashboardCfg && Array.isArray(dashboardCfg.widgets)) {
+                        visualHtml = '<div class="row g-3">' + dashboardCfg.widgets.map(function (widget) {
+                            var widgetImgHtml = widget.image_base64
+                                ? '<img src="' + widget.image_base64 + '" class="chart-img" alt="Chart">'
+                                : '<div class="chart-placeholder"><i class="bi bi-image" style="font-size:2.5rem"></i><p class="mt-2">Chart unavailable</p></div>';
+                            return '<div class="col-md-6">' +
+                                '<div class="card border-0 h-100" style="background:#f8fafc;border-radius:14px;">' +
+                                '<div class="card-body">' +
+                                '<h6 class="mb-3">' + (widget.title || 'Chart') + '</h6>' +
+                                '<div class="chart-box">' + widgetImgHtml + '</div>' +
+                                '</div>' +
+                                '</div>' +
+                                '</div>';
+                        }).join('') + '</div>';
+                    } else {
+                        var imgHtml = cfg.image_base64
+                            ? '<img src="' + cfg.image_base64 + '" class="chart-img" alt="Chart">'
+                            : '<div class="chart-placeholder"><i class="bi bi-image" style="font-size:2.5rem"></i><p class="mt-2">Chart unavailable</p></div>';
+                        visualHtml = '<div class="chart-box">' + imgHtml + '</div>';
+                    }
+
+                    var title = dashboardCfg ? (dashboardCfg.title || 'Dashboard') : (cfg.title || 'Dashboard');
+                    var chartType = dashboardCfg ? 'MULTI' : ((cfg.chart_type || '—').toUpperCase());
+                    var widgetCount = dashboardCfg && Array.isArray(dashboardCfg.widgets) ? dashboardCfg.widgets.length : 1;
+
+                    var div = document.createElement('div');
+                    div.className = 'card-white dash-card'; div.id = 'dash-' + dash.id;
+                    div.innerHTML =
+                        '<div class="row">' +
+                        '<div class="col-md-8">' +
+                        '<h5 class="mb-3">' + title + srcBadge + '</h5>' +
+                        visualHtml +
+                        '</div>' +
+                        '<div class="col-md-4">' +
+                        '<h6 class="mb-2">Actions</h6>' +
+                        '<div class="d-flex flex-wrap gap-2 mb-3">' +
+                        (dashboardCfg ? '' : '<button class="act export" onclick="exportDash(\'' + dash.id + '\')"><i class="bi bi-file-earmark-excel"></i> Excel</button>') +
+                        '<button class="act jira"   onclick="openJiraModal(\'' + dash.id + '\')"><i class="bi bi-journal-text"></i> Task</button>' +
+                        '<button class="act update" onclick="openUpdateModal(\'' + dash.id + '\')"><i class="bi bi-pencil"></i> Update</button>' +
+                        '<button class="act del"    onclick="deleteDash(\'' + dash.id + '\')"><i class="bi bi-trash"></i></button>' +
+                        '</div>' +
+                        '<ul class="list-unstyled small text-muted">' +
+                        '<li><strong>Type:</strong> ' + chartType + '</li>' +
+                        '<li><strong>Widgets:</strong> ' + widgetCount + '</li>' +
+                        '<li><strong>Created:</strong> ' + new Date(dash.created_at).toLocaleString() + '</li>' +
+                        jiraHtml +
+                        '</ul>' +
+                        '</div>' +
+                        '</div>';
+                    area.appendChild(div);
+                });
+            }
+
+            async function loadJiraTasks() {
+                var panel = document.getElementById('jiraPanel');
+                var list = document.getElementById('jiraList');
+                list.innerHTML = '<p class="text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</p>';
+                // Let CSS control display mode (block in regular, flex in compact).
+                panel.style.display = '';
+                try {
+                    var d = await api('/api/jira/tasks');
+                    var tasks = d.tasks || [];
+                    jiraTasksAll = tasks;
+                    jiraTaskPage = 0;
+                    document.getElementById('mTask').textContent = d.count || tasks.length;
+                    renderJiraTasksPage();
+                    renderExecutiveBoard();
+                } catch (e) {
+                    list.innerHTML = '<div class="alert alert-warning small">' + e.message + '</div>';
+                    renderExecutiveBoard();
+                }
+            }
+
+            function renderJiraTasksPage() {
+                var list = document.getElementById('jiraList');
+                var tasks = jiraTasksAll || [];
+                if (!tasks.length) {
+                    list.innerHTML = '<p class="text-muted">No tasks found.</p>';
+                    return;
+                }
+
+                var total = tasks.length;
+                var totalPages = Math.max(1, Math.ceil(total / jiraTaskPageSize));
+                if (jiraTaskPage >= totalPages) jiraTaskPage = totalPages - 1;
+
+                var start = jiraTaskPage * jiraTaskPageSize;
+                var end = Math.min(start + jiraTaskPageSize, total);
+                var pageTasks = tasks.slice(start, end);
+
+                var cardsHtml = pageTasks.map(function (t) {
+                    return '<div class="jira-card">' +
+                        '<div class="d-flex justify-content-between align-items-start">' +
+                        '<div>' +
+                        '<a href="' + (t.url || '#') + '" target="_blank" class="jira-key">' + t.task_id + '</a>' +
+                        '<span class="ms-2 small">' + (t.summary || '') + '</span>' +
+                        '<div class="mt-1 d-flex flex-wrap gap-1">' +
+                        '<span class="badge bg-secondary"><i class="bi bi-person"></i> ' + (t.assignee || 'Unassigned') + '</span>' +
+                        '<span class="badge bg-' + statusBadge(t.status) + '">' + (t.status || '—') + '</span>' +
+                        '<span class="badge bg-' + priorityBadge(t.priority) + '"><i class="bi bi-flag"></i> ' + (t.priority || '—') + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<button class="btn btn-sm btn-outline-primary ms-2" data-taskid="' + t.task_id + '" onclick="openTaskEditModal(this)">' +
+                        '<i class="bi bi-pencil"></i>' +
+                        '</button>' +
+                        '</div></div>';
+                }).join('');
+
+                var pagerHtml =
+                    '<div class="jira-pager">' +
+                    '<div class="jira-pager-info">Showing ' + (start + 1) + '–' + end + ' of ' + total + '</div>' +
+                    '<div class="jira-pager-controls">' +
+                    '<button class="jira-pager-btn" onclick="changeJiraTaskPage(-1)" ' + (jiraTaskPage === 0 ? 'disabled' : '') + '>' +
+                    '<i class="bi bi-chevron-left"></i>' +
+                    '</button>' +
+                    '<button class="jira-pager-btn" onclick="changeJiraTaskPage(1)" ' + (jiraTaskPage >= totalPages - 1 ? 'disabled' : '') + '>' +
+                    '<i class="bi bi-chevron-right"></i>' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>';
+
+                list.innerHTML = cardsHtml + pagerHtml;
+            }
+
+            function changeJiraTaskPage(delta) {
+                var totalPages = Math.max(1, Math.ceil((jiraTasksAll || []).length / jiraTaskPageSize));
+                var next = jiraTaskPage + delta;
+                if (next < 0 || next >= totalPages) return;
+                jiraTaskPage = next;
+                renderJiraTasksPage();
+            }
+
+            async function generateDashboard() {
+                var prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
+                lastPromptRun = prompt;
+                lastPromptOutcome = 'Generating response...';
+                renderExecutiveBoard();
+                spin(true);
+                try {
+                    var result = await api('/api/generate', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+
+                    if (result.needs_project) {
+                        lastPromptOutcome = result.response || 'Project selection required';
+                        renderExecutiveBoard();
+                        toast('Please select a Jira project first', 'warning');
+                        window.location.href = '/select-project';
+                        return;
+                    }
+                    // Handle clear command
+                    if (result.cleared) {
+                        lastPromptOutcome = result.response || 'All dashboards cleared.';
+                        dashboards = [];
+                        renderDashboards();
+                        renderExecutiveBoard();
+                        await loadMetrics();
+                        toast('All dashboards cleared!', 'info');
+                        return;
+                    }
+                    if (result.result_type) {
+                        lastPromptOutcome = result.response || ('Returned ' + String(result.result_type).replace('_', ' '));
+                        renderExecutiveBoard();
+                        showQueryTable(result.result_type, result.jira_results || [], result.response);
+                        await loadJiraTasks();
+                        return;
+                    }
+                    if (result.dashboard_config || result.chart_config) {
+                        lastPromptOutcome = result.response ||
+                            (result.dashboard_config
+                                ? 'Dashboard created: ' + (result.dashboard_config.title || 'Untitled dashboard')
+                                : 'Dashboard created: ' + ((result.chart_config && result.chart_config.title) || 'Untitled chart dashboard'));
+                        currentDashId = result.dashboard_config ? result.dashboard_config.dashboard_id : result.chart_config.chart_id;
+                        document.getElementById('updateBtn').disabled = false;
+                        await loadDashboards();
+                        await loadMetrics();
+                        toast('Dashboard created!', 'success');
+                        if (result.auto_export && result.dashboard_id) {
+                            setTimeout(function () { exportDash(result.dashboard_id); }, 900);
+                        }
+                        if (result.jira_task) await loadJiraTasks();
+                        return;
+                    }
+                    if (result.response) {
+                        lastPromptOutcome = result.response;
+                        renderExecutiveBoard();
+                        showTextCard(result.response);
+                    }
+                } catch (e) {
+                    lastPromptOutcome = 'Failed: ' + e.message;
+                    renderExecutiveBoard();
+                    toast('Error: ' + e.message, 'danger');
+                }
+                finally { spin(false); }
+            }
+
+            function showQueryTable(resultType, results, responseText) {
+                var area = document.getElementById('resultsArea');
+                var bodyHtml = '';
+                if (resultType === 'sprints') {
+                    bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Sprint</th><th>State</th><th>Start</th><th>End</th></tr></thead><tbody>' +
+                        results.map(function (s) {
+                            return '<tr><td><strong>' + (s.name || '—') + '</strong></td><td><span class="badge bg-' +
+                                (s.state === 'active' ? 'success' : s.state === 'closed' ? 'secondary' : 'info') + '">' +
+                                (s.state || '—').toUpperCase() + '</span></td><td>' + (s.start_date || s.startDate || '—') + '</td><td>' + (s.end_date || s.endDate || '—') + '</td></tr>';
+                        }).join('') + '</tbody></table>';
+                } else if (resultType === 'assignees') {
+                    bodyHtml = results.map(function (r) {
+                        return '<div class="mb-2"><span class="badge bg-primary me-2">' + r.count + '</span><strong>' + r.name + '</strong></div>';
+                    }).join('');
+                } else if (resultType === 'issue_detail') {
+                    var i = results[0] || {};
+                    bodyHtml = '<table class="table table-sm"><tbody>' +
+                        ['key', 'summary', 'status', 'assignee', 'priority', 'type', 'created', 'updated'].map(function (k) {
+                            return i[k] ? '<tr><td class="fw-bold text-muted" style="width:120px">' + k.charAt(0).toUpperCase() + k.slice(1) + '</td><td>' + i[k] + '</td></tr>' : '';
+                        }).join('') + '</tbody></table>';
+                } else {
+                    bodyHtml = '<table class="table table-hover table-sm"><thead class="table-dark"><tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th><th>Priority</th></tr></thead><tbody>' +
+                        results.map(function (i) {
+                            var f = i.fields || i;
+                            var status = (f.status && f.status.name) ? f.status.name : (i.status || '—');
+                            var assignee = (f.assignee && f.assignee.displayName) ? f.assignee.displayName : (i.assignee || 'Unassigned');
+                            var priority = (f.priority && f.priority.name) ? f.priority.name : (i.priority || '—');
+                            var summary = f.summary || i.summary || '';
+                            var key = i.key || '';
+                            return '<tr><td><strong class="text-info">' + key + '</strong></td><td>' + summary.slice(0, 55) + '</td>' +
+                                '<td><span class="badge bg-' + statusBadge(status) + '">' + status + '</span></td>' +
+                                '<td>' + assignee + '</td><td>' + priority + '</td></tr>';
+                        }).join('') + '</tbody></table>';
+                }
+
+                var titles = { sprints: 'Sprint List', assignees: 'Assignee Breakdown', issues: 'Issue List', issue_detail: 'Issue Details' };
+                var card = document.createElement('div');
+                card.className = 'q-card';
+                var responseNote = responseText ? '<div class="q-card-note">' + escapeHtml(responseText) + '</div>' : '';
+                card.innerHTML =
+                    '<div class="q-card-head">' +
+                    '<div>' +
+                    '<div class="q-card-title"><h5 class="mb-0"><i class="bi bi-journal-text text-info"></i> ' + (titles[resultType] || 'Jira Results') + '</h5></div>' +
+                    '<div class="q-card-meta">' +
+                    '<span class="q-chip type">' + escapeHtml(resultType.replace('_', ' ')) + '</span>' +
+                    '<span class="q-chip count">' + results.length + ' records</span>' +
+                    '<span class="q-chip time">' + escapeHtml(new Date().toLocaleTimeString()) + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<button class="q-dismiss-btn" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i> Dismiss</button>' +
+                    '</div>' + responseNote + '<div class="table-responsive">' + bodyHtml + '</div>';
+                area.insertBefore(card, area.firstChild);
+                revealLatestResult(card);
+            }
+
+            function showTextCard(text) {
+                var area = document.getElementById('resultsArea');
+                var card = document.createElement('div');
+                card.className = 'q-card';
+                card.innerHTML =
+                    '<div class="q-card-head">' +
+                    '<div>' +
+                    '<div class="q-card-title"><h6 class="mb-0"><i class="bi bi-info-circle text-info"></i> Result</h6></div>' +
+                    '<div class="q-card-meta">' +
+                    '<span class="q-chip type">insight</span>' +
+                    '<span class="q-chip time">' + escapeHtml(new Date().toLocaleTimeString()) + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<button class="q-dismiss-btn" onclick="this.closest(\'.q-card\').remove()"><i class="bi bi-x"></i> Dismiss</button>' +
+                    '</div><pre>' + escapeHtml(text) + '</pre>';
+                area.insertBefore(card, area.firstChild);
+                revealLatestResult(card);
+            }
+
+            function revealLatestResult(card) {
+                if (!card) return;
+                card.classList.add('q-card-new');
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(function () {
+                    card.classList.remove('q-card-new');
+                }, 700);
+            }
+
+            async function exportDash(id) {
+                try {
+                    var res = await fetch('/api/export/' + id);
+                    if (res.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    if (!res.ok) {
+                        var ct = (res.headers.get('content-type') || '').toLowerCase();
+                        var msg = 'Export failed (HTTP ' + res.status + ')';
+                        if (ct.includes('application/json')) {
+                            var e = await res.json();
+                            msg = e.error || msg;
+                        } else {
+                            var text = await res.text();
+                            if (text && !text.trim().toLowerCase().startsWith('<!doctype')) {
+                                msg = text;
+                            }
+                        }
+                        throw new Error(msg);
+                    }
+                    var blob = await res.blob();
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url; a.download = 'dashboard_' + id + '.xlsx';
+                    document.body.appendChild(a); a.click();
+                    document.body.removeChild(a); URL.revokeObjectURL(url);
+                    exportCount++;
+                    document.getElementById('mExport').textContent = exportCount;
+                    toast('Excel downloaded!', 'success');
+                } catch (e) { toast('Export error: ' + e.message, 'danger'); }
+            }
+
+            function openJiraModal(dashId) {
+                document.getElementById('modalDashId').value = dashId;
+                document.getElementById('modalSummary').value = 'Dashboard Task';
+                document.getElementById('modalDesc').value = '';
+                document.getElementById('modalPriority').value = 'Medium';
+                new bootstrap.Modal(document.getElementById('jiraModal')).show();
+            }
+
+            async function submitJiraTask() {
+                try {
+                    var result = await api('/api/jira/tasks', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            summary: document.getElementById('modalSummary').value,
+                            description: document.getElementById('modalDesc').value,
+                            priority: document.getElementById('modalPriority').value,
+                            dashboard_id: document.getElementById('modalDashId').value,
+                        })
+                    });
+                    toast('Task created: ' + result.task.task_id, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('jiraModal')).hide();
+                    await loadJiraTasks(); await loadProjectIntelligence(); await loadMetrics();
+                } catch (e) { toast('Jira error: ' + e.message, 'danger'); }
+            }
+
+            async function openTaskEditModal(btn) {
+                var taskId = btn.getAttribute('data-taskid');
+                try {
+                    var d = await api('/api/jira/tasks/' + taskId + '/edit-data');
+                    document.getElementById('taskEditId').value = taskId;
+                    document.getElementById('taskEditSummary').value = (d.current && d.current.summary) ? d.current.summary : '';
+
+                    var assigneeSel = document.getElementById('taskEditAssignee');
+                    var assigneeOpts = '<option value="">Unassigned</option>';
+                    (d.assignees || []).forEach(function (u) {
+                        var selected = (d.current && d.current.assignee && d.current.assignee.accountId === u.accountId) ? ' selected' : '';
+                        assigneeOpts += '<option value="' + u.accountId + '"' + selected + '>' + (u.displayName || 'Unknown User') + '</option>';
+                    });
+                    assigneeSel.innerHTML = assigneeOpts;
+
+                    var prioritySel = document.getElementById('taskEditPriority');
+                    var priorityOpts = '';
+                    (d.priorities || []).forEach(function (p) {
+                        var selected = (d.current && d.current.priority === p) ? ' selected' : '';
+                        priorityOpts += '<option value="' + p + '"' + selected + '>' + p + '</option>';
+                    });
+                    prioritySel.innerHTML = priorityOpts || '<option value="">None</option>';
+
+                    var statusSel = document.getElementById('taskEditStatus');
+                    var statusOpts = '';
+                    (d.statuses || []).forEach(function (s) {
+                        var selected = (d.current && d.current.status === s.name) ? ' selected' : '';
+                        statusOpts += '<option value="' + s.id + '"' + selected + '>' + s.name + '</option>';
+                    });
+                    statusSel.innerHTML = statusOpts || '<option value="">No transitions available</option>';
+
+                    taskEditModal = taskEditModal || new bootstrap.Modal(document.getElementById('taskEditModal'));
+                    taskEditModal.show();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+            }
+
+            async function saveTaskEdit() {
+                var taskId = document.getElementById('taskEditId').value;
+                if (!taskId) return;
+
+                var payload = {
+                    summary: document.getElementById('taskEditSummary').value.trim(),
+                    assignee_account_id: document.getElementById('taskEditAssignee').value,
+                    priority: document.getElementById('taskEditPriority').value,
+                };
+
+                var statusId = document.getElementById('taskEditStatus').value;
+                if (statusId) payload.status_id = statusId;
+
+                try {
+                    await api('/api/jira/tasks/' + taskId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    toast(taskId + ' updated!', 'success');
+                    if (taskEditModal) taskEditModal.hide();
+                    await loadJiraTasks();
+                    await loadProjectIntelligence();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+            }
+
+            function openUpdateModal(dashId) {
+                currentDashId = dashId;
+                document.getElementById('updatePrompt').value = document.getElementById('promptInput').value;
+                new bootstrap.Modal(document.getElementById('updateModal')).show();
+            }
+
+            async function confirmUpdate() {
+                var p = document.getElementById('updatePrompt').value.trim();
+                if (!p) { toast('Please enter a prompt', 'warning'); return; }
+                document.getElementById('promptInput').value = p;
+                bootstrap.Modal.getInstance(document.getElementById('updateModal')).hide();
+                await updateDashboard();
+            }
+
+            async function updateDashboard() {
+                if (!currentDashId) { toast('No dashboard selected', 'warning'); return; }
+                var prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) { toast('Please enter a prompt', 'warning'); return; }
+                spin(true);
+                try {
+                    await api('/api/dashboard/' + currentDashId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+                    toast('Updated!', 'success'); await loadDashboards(); await loadMetrics();
+                } catch (e) { toast('Error: ' + e.message, 'danger'); }
+                finally { spin(false); }
+            }
+
+            function deleteDash(id) {
+                if (!confirm('Delete this dashboard?')) return;
+                dashboards = dashboards.filter(function (d) { return d.id !== id; });
+                var el = document.getElementById('dash-' + id);
+                if (el) el.remove();
+                if (!dashboards.length) renderDashboards();
+                loadMetrics(); toast('Deleted', 'info');
+            }
+
+            function chartIcon(t) { return ({ pie: 'pie-chart', bar: 'bar-chart', line: 'graph-up', metrics: 'speedometer2' })[t] || 'graph-up'; }
+            function statusBadge(s) { return ({ 'To Do': 'secondary', 'In Progress': 'warning', 'In Review': 'info', 'Done': 'success' })[s] || 'secondary'; }
+            function priorityBadge(p) { return ({ Low: 'secondary', Medium: 'info', High: 'warning', Critical: 'danger' })[p] || 'secondary'; }
+            function riskBadgeClass(level) { return ({ Low: 'success', Medium: 'warning', High: 'danger' })[level] || 'secondary'; }
+        </script>
+</body>
+
+</html>

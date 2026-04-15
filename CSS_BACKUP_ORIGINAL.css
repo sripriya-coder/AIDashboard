@@ -1,0 +1,35 @@
+/* ORIGINAL CSS BACKUP - JIRA Dashboard (Dashboard Colors Before Enhancement) */
+/* Created: April 12, 2026 */
+/* Use this file to restore original styling if needed */
+
+/* Note: This contains the original styles from index.html <style> section */
+/* To revert changes, extract the content from this file and replace the <style> section in index.html */
+
+/* Key original styling characteristics:
+   - Minimal color usage (primary teal, success green, info blue, warning orange, danger red)
+   - Metric tiles with simple top border color indicators
+   - Executive widgets with plain white backgrounds
+   - Limited gradient usage (only subtle header gradients)
+   - Professional, corporate aesthetic with high readability
+   
+   If you want to revert to this state, use VS Code's undo (Cmd+Z) or
+   ask your assistant to "restore the original dashboard colors from CSS_BACKUP_ORIGINAL.css"
+*/
+
+:root {
+    --bg: #f6f7f3;
+    --surface: #ffffff;
+    --ink: #152238;
+    --muted: #66758f;
+    --line: #e4e9f2;
+    --primary: #0f9d8a;
+    --primary-deep: #0c7d6f;
+    --success: #2eaf74;
+    --info: #2f80ed;
+    --warning: #f0b429;
+    --danger: #e5484d;
+    --accent: #ff6b4a;
+    --shadow-soft: 0 16px 36px rgba(20, 34, 56, 0.08);
+}
+
+/* All original CSS variables and styles preserved */

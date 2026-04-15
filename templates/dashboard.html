@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrum Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f8f9fa;
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        .widget {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px #0001;
+            padding: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Scrum Dashboard</h1>
+    <div class="dashboard-container">
+        <div class="widget">
+            <h2>Burndown Chart (Sample)</h2>
+            <canvas id="burndownChart" height="120"></canvas>
+        </div>
+        <!-- More widgets can be added here -->
+    </div>
+    <script>
+        fetch('/api/burndown')
+            .then(res => res.json())
+            .then(data => {
+                new Chart(document.getElementById('burndownChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: data.dates,
+                        datasets: [
+                            { label: 'Ideal', data: data.ideal, borderColor: '#888', fill: false },
+                            { label: 'Actual', data: data.actual, borderColor: '#007bff', fill: false }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            });
+    </script>
+</body>
+
+</html>

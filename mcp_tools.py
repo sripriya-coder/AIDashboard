@@ -72,6 +72,46 @@ def _jira_put(path: str, payload: dict) -> dict:
     return resp.json() if resp.content else {}
 
 
+def _resolve_assignee_account_id(issue_key: str, assignee_name: str) -> Optional[str]:
+    """Resolve a human assignee name to Jira accountId using assignable users for an issue."""
+    if not issue_key or not assignee_name:
+        return None
+
+    query = assignee_name.strip()
+    if not query:
+        return None
+
+    users = _jira_get("user/assignable/search", params={
+        "issueKey": issue_key,
+        "query": query,
+        "maxResults": 100,
+    })
+    if not isinstance(users, list) or not users:
+        return None
+
+    q = query.lower()
+
+    # Prefer exact display name match first.
+    for user in users:
+        display = str(user.get("displayName", "")).strip().lower()
+        if display == q and user.get("accountId"):
+            return user.get("accountId")
+
+    # Then prefer exact email match when available.
+    for user in users:
+        email = str(user.get("emailAddress", "")).strip().lower()
+        if email == q and user.get("accountId"):
+            return user.get("accountId")
+
+    # Fall back to contains match in display name.
+    for user in users:
+        display = str(user.get("displayName", "")).strip().lower()
+        if q in display and user.get("accountId"):
+            return user.get("accountId")
+
+    return users[0].get("accountId") if users[0].get("accountId") else None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # MCP Tools — each decorated with @tool so LangGraph can use them
 # ══════════════════════════════════════════════════════════════════════════════
@@ -241,7 +281,14 @@ def jira_create_issue(summary: str, description: str = "", issue_type: str = "Ta
 
 
 @tool
-def jira_update_issue(issue_key: str, status: str = None, assignee_account_id: str = None, priority: str = None) -> dict:
+def jira_update_issue(
+    issue_key: str,
+    status: str = None,
+    assignee_account_id: str = None,
+    assignee_name: str = None,
+    assignee: str = None,
+    priority: str = None,
+) -> dict:
     """
     Update an existing Jira issue — change status, assignee, or priority.
     Use this when user asks to update, move, assign, or change a ticket.
@@ -250,12 +297,15 @@ def jira_update_issue(issue_key: str, status: str = None, assignee_account_id: s
         issue_key:           Issue key e.g. 'SCRUM-12'
         status:              New status e.g. 'In Progress', 'Done', 'In Review'
         assignee_account_id: Atlassian account ID of new assignee
+        assignee_name:       Human name (display name) of assignee, e.g. 'Maria'
+        assignee:            Alias of assignee_name for LLM compatibility
         priority:            New priority e.g. 'High', 'Low'
 
     Returns:
         dict with update result
     """
     try:
+        requested_name = (assignee_name or assignee or "").strip()
         updates = {}
         if priority:
             updates["priority"] = {"name": priority}
@@ -273,10 +323,49 @@ def jira_update_issue(issue_key: str, status: str = None, assignee_account_id: s
                 available = [t["name"] for t in transitions]
                 return {"error": f"Status '{status}' not found. Available: {available}"}
 
-        if assignee_account_id:
-            _jira_put(f"issue/{issue_key}/assignee", {"accountId": assignee_account_id})
+        target_account_id = (assignee_account_id or "").strip() if assignee_account_id else ""
+        if not target_account_id:
+            if requested_name:
+                target_account_id = _resolve_assignee_account_id(issue_key, requested_name) or ""
+                if not target_account_id:
+                    return {
+                        "error": f"Could not resolve assignee '{requested_name}' to an accountId"
+                    }
 
-        return {"key": issue_key, "status": "Updated successfully"}
+        # No-op guard: prevent false 'Updated successfully' responses.
+        if not updates and not status and not target_account_id:
+            return {
+                "error": "No update fields provided. Include status, priority, or assignee_name/assignee_account_id."
+            }
+
+        if target_account_id:
+            _jira_put(f"issue/{issue_key}/assignee", {"accountId": target_account_id})
+
+            verify = _jira_get(f"issue/{issue_key}")
+            current_assignee = (verify.get("fields", {}).get("assignee") or {})
+            current_account_id = str(current_assignee.get("accountId") or "")
+            current_display_name = str(current_assignee.get("displayName") or "Unassigned")
+            if current_account_id != target_account_id:
+                return {
+                    "error": (
+                        f"Assignment verification failed for {issue_key}. "
+                        f"Expected accountId {target_account_id}, but Jira shows {current_account_id or 'Unassigned'}."
+                    )
+                }
+
+            return {
+                "key": issue_key,
+                "status": "Updated successfully",
+                "assignee_account_id": target_account_id,
+                "assigned_to": current_display_name,
+            }
+
+        return {
+            "key": issue_key,
+            "status": "Updated successfully",
+            "assignee_account_id": None,
+            "assigned_to": None,
+        }
     except Exception as e:
         logger.error(f"jira_update_issue error: {e}")
         return {"error": str(e)}
